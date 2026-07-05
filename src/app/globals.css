@@ -1,26 +1,290 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* --- night sky --- */
+  --night: #0b1030;
+  --night-deep: #080b24;
+  --mtn-a: #2a3566;
+  --mtn-b: #3a478a;
+
+  /* --- parchment & wood --- */
+  --parchment: #e7c08f;
+  --parchment-hi: #f2d5aa;
+  --wood: #8a5a2c;
+  --wood-dark: #7a4a22;
+  --menu-bar: #e0a86a;
+
+  /* --- ink (text on parchment) --- */
+  --ink: #3a2a18;
+  --ink-body: #4a3826;
+  --ink-muted: #7c6547;
+  --link: #a9622a;
+  --gold: #f6c453;
+
+  /* --- dark UI chrome (admin / text on the night sky) --- */
+  --foreground: #e8e0d5;
+  --heading: #f5efe4;
+  --surface: #141a3d;
+  --surface-2: #1b2350;
+  --border: #2a3566;
+  --accent-hover: #ffd873;
+
+  /* --- content colors, overridden per-context (see .panel) --- */
+  --content-body: #d6cebf;
+  --content-heading: var(--heading);
+  --content-link: var(--gold);
+  --content-code-bg: rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-night: var(--night);
+  --color-parchment: var(--parchment);
+  --color-wood: var(--wood);
+  --color-gold: var(--gold);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-link: var(--link);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--night);
+  --color-foreground: var(--foreground);
+  --color-heading: var(--heading);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-accent: var(--gold);
+  --color-accent-hover: var(--accent-hover);
+
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #131a45 0%, transparent 55%),
+    linear-gradient(180deg, var(--night) 0%, var(--night-deep) 100%);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--night);
+}
+
+/* ---------- starfield sky header ---------- */
+.sky {
+  position: relative;
+}
+
+.star {
+  position: absolute;
+  border-radius: 50%;
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.mtn {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 110px;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(135deg, transparent 49%, var(--mtn-a) 50%) 0 0 / 72px 110px
+      repeat-x,
+    linear-gradient(45deg, transparent 49%, var(--mtn-b) 50%) 36px 0 / 72px 110px
+      repeat-x;
+}
+
+/* ---------- wordmark ---------- */
+.wordmark {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.wordmark .eyebrow {
+  margin-bottom: 6px;
+}
+
+/* A — cozy glow (default) */
+.t-a .eyebrow {
+  font-family: var(--font-pixelify), monospace;
+  font-size: 16px;
+  color: #f4b942;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(244, 185, 66, 0.6);
+}
+.t-a .line1 {
+  font-family: var(--font-luckiest), cursive;
+  font-size: 52px;
+  line-height: 0.95;
+  color: #fbe7b0;
+  -webkit-text-stroke: 3px #b5591b;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 22px rgba(246, 196, 83, 0.55),
+    0 4px 0 #7a3f10;
+}
+.t-a .line2 {
+  font-family: var(--font-luckiest), cursive;
+  font-size: 64px;
+  line-height: 0.95;
+  margin-top: 2px;
+  color: #f6b83f;
+  -webkit-text-stroke: 3px #8a3d0c;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 26px rgba(246, 150, 40, 0.6),
+    0 5px 0 #6b2f08;
+}
+
+/* B — neon pixel */
+.t-b .eyebrow {
+  font-family: var(--font-pixelify), monospace;
+  font-size: 14px;
+  color: #57e0c4;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+.t-b .line1 {
+  font-family: var(--font-press-start), monospace;
+  font-size: 26px;
+  line-height: 1.4;
+  color: #ff5db1;
+  text-shadow:
+    0 0 10px #ff5db1,
+    0 0 20px rgba(255, 93, 177, 0.6);
+}
+.t-b .line2 {
+  font-family: var(--font-press-start), monospace;
+  font-size: 26px;
+  line-height: 1.4;
+  margin-top: 10px;
+  color: #57e0c4;
+  text-shadow:
+    0 0 10px #57e0c4,
+    0 0 20px rgba(87, 224, 196, 0.6);
+}
+
+/* C — gothic parchment */
+.t-c .eyebrow {
+  font-family: var(--font-eb-garamond), serif;
+  font-style: italic;
+  font-size: 17px;
+  color: #e7c08f;
+}
+.t-c .line1,
+.t-c .line2 {
+  display: inline;
+  font-family: var(--font-cinzel), serif;
+  font-weight: 700;
+  font-size: 40px;
+  color: #f2d5aa;
+  letter-spacing: 1px;
+  line-height: 1.1;
+}
+.t-c .rule {
+  width: 130px;
+  height: 2px;
+  background: #c79a5f;
+  margin: 14px auto 0;
+}
+
+/* D — minimal modern */
+.t-d .eyebrow {
+  order: 2;
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 12px;
+  color: #8a7c6a;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin: 10px 0 0;
+}
+.t-d .line1,
+.t-d .line2 {
+  display: inline;
+  font-family: var(--font-inter), sans-serif;
+  font-weight: 500;
+  font-size: 44px;
+  color: #e8e0d5;
+  letter-spacing: -1px;
+  line-height: 1.05;
+}
+.t-d .line2 {
+  color: var(--gold);
+}
+
+@media (max-width: 480px) {
+  .t-a .line1 {
+    font-size: 40px;
+  }
+  .t-a .line2 {
+    font-size: 50px;
+  }
+  .t-b .line1,
+  .t-b .line2 {
+    font-size: 19px;
+  }
+  .t-c .line1,
+  .t-c .line2 {
+    font-size: 30px;
+  }
+  .t-d .line1,
+  .t-d .line2 {
+    font-size: 34px;
+  }
+}
+
+/* ---------- wooden menu bar ---------- */
+.nav-inner {
+  display: inline-flex;
+  gap: 28px;
+  align-items: center;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 10px;
+  padding: 9px 28px;
+  box-shadow: inset 0 0 0 2px #f0c48c;
+}
+.nav-inner a {
+  font-family: var(--font-pixelify), monospace;
+  font-size: 18px;
+  color: #5c3416;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.nav-inner a:hover {
+  color: #7a4410;
+}
+
+/* ---------- parchment panel ---------- */
+.panel {
+  --content-body: var(--ink-body);
+  --content-heading: var(--ink);
+  --content-link: var(--link);
+  --content-code-bg: rgba(122, 74, 34, 0.14);
+
+  position: relative;
+  background: var(--parchment);
+  border: 4px solid var(--wood);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 3px var(--parchment-hi);
 }
