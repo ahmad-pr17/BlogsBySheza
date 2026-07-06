@@ -1,3 +1,4 @@
+import { Fireflies } from "@/components/Fireflies";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { PageBackground } from "@/components/PageBackground";
@@ -17,6 +18,13 @@ export default function PublicLayout({
       <Header />
       <main className="flex flex-1 flex-col">{children}</main>
       <Footer />
+      {/* Foreground fireflies drift over the content (never block clicks). */}
+      <Fireflies
+        count={16}
+        seed={0xb17f001}
+        sizeBoost={1}
+        className="fireflies-front"
+      />
     </>
   );
 }

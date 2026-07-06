@@ -106,6 +106,16 @@ body {
   );
 }
 
+/* Foreground firefly layer: floats above the page content, but lets all
+   clicks through so links and buttons stay usable. */
+.fireflies-front {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .star {
   position: absolute;
   border-radius: 50%;
@@ -119,6 +129,56 @@ body {
   }
   50% {
     opacity: 1;
+  }
+}
+
+/* ---------- retro fireflies ---------- */
+/* Blocky pixel core (no rounding) with a hard stepped halo + soft glow, in a
+   warm yellow-green. Each drifts along its own path and blinks independently.
+   Per-firefly path offsets and timing come in via CSS variables; the animation
+   shorthand (like .star) keeps the keyframe references visible to the compiler. */
+.firefly {
+  position: absolute;
+  background: #eaff8a;
+  box-shadow:
+    0 0 0 2px rgba(180, 255, 90, 0.2),
+    0 0 8px 2px rgba(210, 255, 130, 0.55);
+  animation:
+    firefly-move var(--md, 12s) ease-in-out 0s infinite,
+    firefly-glow var(--gd, 4s) ease-in-out var(--gdelay, 0s) infinite;
+}
+
+@keyframes firefly-move {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(var(--x1), var(--y1));
+  }
+  50% {
+    transform: translate(var(--x2), var(--y2));
+  }
+  75% {
+    transform: translate(var(--x3), var(--y3));
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes firefly-glow {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .firefly {
+    animation: firefly-glow 4s ease-in-out infinite;
   }
 }
 

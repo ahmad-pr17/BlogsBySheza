@@ -1,3 +1,4 @@
+import { Fireflies } from "@/components/Fireflies";
 import { Starfield } from "@/components/Starfield";
 import { resolveBackground } from "@/lib/settings";
 
@@ -18,6 +19,7 @@ export async function PageBackground() {
       )}
       {bg.scrim && <div className="page-bg-scrim" />}
       <Starfield />
+      <Fireflies count={34} seed={0x1eff1e5} />
       {bg.mountains && <div className="page-mtn" />}
     </div>
   );
