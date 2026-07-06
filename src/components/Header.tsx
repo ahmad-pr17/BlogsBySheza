@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Starfield } from "@/components/Starfield";
 import { Wordmark } from "@/components/Wordmark";
 import { getTitleStyle } from "@/lib/settings";
 
@@ -14,8 +13,6 @@ export async function Header() {
 
   return (
     <header className="sky px-4 pt-12 pb-16">
-      <Starfield />
-
       <div className="mx-auto max-w-3xl">
         <Link href="/" className="block">
           <Wordmark style={titleStyle} />
@@ -31,8 +28,6 @@ export async function Header() {
           </div>
         </nav>
       </div>
-
-      <div className="mtn" />
     </header>
   );
 }

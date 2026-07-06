@@ -1,5 +1,6 @@
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { PageBackground } from "@/components/PageBackground";
 
 // The header reads the current title style from the DB, so keep public pages
 // dynamic — otherwise a prerendered page would show a stale wordmark.
@@ -12,6 +13,7 @@ export default function PublicLayout({
 }>) {
   return (
     <>
+      <PageBackground />
       <Header />
       <main className="flex flex-1 flex-col">{children}</main>
       <Footer />

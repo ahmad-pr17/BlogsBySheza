@@ -14,11 +14,12 @@ function mulberry32(seed: number) {
 
 const rand = mulberry32(20260706);
 
-const STARS = Array.from({ length: 44 }, () => {
+const STARS = Array.from({ length: 150 }, () => {
   const size = 1 + Math.round(rand() * 2);
   return {
     size,
-    top: Math.round(rand() * 150),
+    // spread across the full viewport height (percentage), not just the header
+    top: +(rand() * 100).toFixed(2),
     left: +(rand() * 100).toFixed(2),
     color: STAR_COLORS[Math.floor(rand() * STAR_COLORS.length)],
     delay: +(rand() * 4).toFixed(2),
@@ -35,7 +36,7 @@ export function Starfield() {
           style={{
             width: star.size,
             height: star.size,
-            top: star.top,
+            top: `${star.top}%`,
             left: `${star.left}%`,
             background: star.color,
             animationDelay: `${star.delay}s`,

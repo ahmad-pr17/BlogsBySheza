@@ -72,9 +72,38 @@ body {
   color: var(--night);
 }
 
-/* ---------- starfield sky header ---------- */
+/* ---------- full-page starry sky + mountains ---------- */
 .sky {
   position: relative;
+}
+
+/* Fixed layer behind all content: stars + retro mountain range. */
+.page-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Uploaded / preset image, covering the viewport behind everything else. */
+.page-bg-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Darkening scrim for legibility over bright images. */
+.page-bg-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 11, 36, 0.45) 0%,
+    rgba(8, 11, 36, 0.25) 40%,
+    rgba(8, 11, 36, 0.5) 100%
+  );
 }
 
 .star {
@@ -93,19 +122,15 @@ body {
   }
 }
 
-.mtn {
+.page-mtn {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 110px;
-  pointer-events: none;
-  z-index: 1;
-  background:
-    linear-gradient(135deg, transparent 49%, var(--mtn-a) 50%) 0 0 / 72px 110px
-      repeat-x,
-    linear-gradient(45deg, transparent 49%, var(--mtn-b) 50%) 36px 0 / 72px 110px
-      repeat-x;
+  height: 200px;
+  background: url("/mountains.svg") repeat-x bottom center;
+  background-size: auto 200px;
+  image-rendering: pixelated;
 }
 
 /* ---------- wordmark ---------- */

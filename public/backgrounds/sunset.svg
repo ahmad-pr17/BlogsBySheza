@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3d2a63" />
+      <stop offset="42%" stop-color="#8a4a7a" />
+      <stop offset="68%" stop-color="#e07a4a" />
+      <stop offset="86%" stop-color="#f4a94f" />
+      <stop offset="100%" stop-color="#f6c06a" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff2c4" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#fff2c4" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sky)" />
+  <circle cx="1120" cy="700" r="220" fill="url(#glow)" />
+  <circle cx="1120" cy="700" r="72" fill="#fff2c4" />
+  <polygon fill="#7a5a8c" points="0,600 220,430 400,540 620,380 840,500 1060,410 1280,540 1480,440 1600,510 1600,1000 0,1000" />
+  <polygon fill="#5a3f6e" points="0,720 260,560 460,660 700,520 940,640 1180,540 1420,660 1600,600 1600,1000 0,1000" />
+  <polygon fill="#2e2440" points="0,860 300,730 560,820 820,700 1080,820 1360,720 1600,800 1600,1000 0,1000" />
+</svg>
