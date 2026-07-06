@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { StickerPicker } from "@/components/admin/StickerPicker";
 import { Status } from "@/generated/prisma/enums";
 import type { PostModel } from "@/generated/prisma/models/Post";
+import { uploadImage } from "@/lib/upload";
 
 type Props =
   | { mode: "new"; post?: undefined }
@@ -19,7 +21,47 @@ export function PostForm({ mode, post }: Props) {
   const [content, setContent] = useState(post?.content ?? "");
   const [showPreview, setShowPreview] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  // Inserts markdown at the textarea cursor (falling back to appending) and
+  // keeps the local content state in sync.
+  function insertIntoContent(markdown: string) {
+    const el = contentRef.current;
+    if (!el) {
+      setContent((c) => c + markdown);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = content.slice(0, start) + markdown + content.slice(end);
+    setContent(next);
+    // Restore the caret just after the inserted text on the next tick.
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + markdown.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  async function handleUpload(file: File, into: "cover" | "content") {
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await uploadImage(file);
+      if (into === "cover") {
+        setCoverImage(url);
+      } else {
+        const alt = file.name.replace(/\.[^.]+$/, "");
+        insertIntoContent(`\n\n![${alt}](${url})\n\n`);
+      }
+    } catch {
+      setError("Upload failed. Check that the Blob store is configured.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const payload = () => ({
     title,
@@ -97,15 +139,39 @@ export function PostForm({ mode, post }: Props) {
             className="rounded border border-border bg-surface px-3 py-2 text-foreground outline-none focus:border-accent"
           />
         </label>
-        <label className="flex flex-col gap-2 text-sm text-foreground/80 sm:col-span-2">
-          Cover image URL
-          <input
-            value={coverImage}
-            onChange={(e) => setCoverImage(e.target.value)}
-            placeholder="https://…"
-            className="rounded border border-border bg-surface px-3 py-2 text-foreground outline-none focus:border-accent"
-          />
-        </label>
+        <div className="flex flex-col gap-2 text-sm text-foreground/80 sm:col-span-2">
+          Cover image
+          <div className="flex gap-2">
+            <input
+              value={coverImage}
+              onChange={(e) => setCoverImage(e.target.value)}
+              placeholder="Paste a URL or upload…"
+              className="flex-1 rounded border border-border bg-surface px-3 py-2 text-foreground outline-none focus:border-accent"
+            />
+            <label className="cursor-pointer whitespace-nowrap rounded border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent">
+              {uploading ? "Uploading…" : "Upload"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file, "cover");
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          {coverImage && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={coverImage}
+              alt="Cover preview"
+              className="mt-1 max-h-40 w-auto rounded border border-border"
+            />
+          )}
+        </div>
         <label className="flex flex-col gap-2 text-sm text-foreground/80 sm:col-span-2">
           Excerpt
           <input
@@ -122,16 +188,38 @@ export function PostForm({ mode, post }: Props) {
           <span className="text-sm text-foreground/80">
             Content (Markdown)
           </span>
-          <button
-            type="button"
-            onClick={() => setShowPreview((v) => !v)}
-            className="text-sm text-accent hover:text-accent-hover"
-          >
-            {showPreview ? "Hide preview" : "Show preview"}
-          </button>
+          <div className="flex items-center gap-4">
+            <label className="cursor-pointer text-sm text-accent hover:text-accent-hover">
+              {uploading ? "Uploading…" : "Insert image"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file, "content");
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <StickerPicker
+              onInsert={(url, name) =>
+                insertIntoContent(`\n\n![${name}](${url})\n\n`)
+              }
+            />
+            <button
+              type="button"
+              onClick={() => setShowPreview((v) => !v)}
+              className="text-sm text-accent hover:text-accent-hover"
+            >
+              {showPreview ? "Hide preview" : "Show preview"}
+            </button>
+          </div>
         </div>
         <div className={`grid gap-4 ${showPreview ? "sm:grid-cols-2" : ""}`}>
           <textarea
+            ref={contentRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={16}

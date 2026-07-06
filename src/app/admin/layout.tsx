@@ -31,6 +31,12 @@ export default async function AdminLayout({
                   Posts
                 </Link>
                 <Link
+                  href="/admin/stickers"
+                  className="text-foreground/60 transition-colors hover:text-accent"
+                >
+                  Stickers
+                </Link>
+                <Link
                   href="/admin/settings"
                   className="text-foreground/60 transition-colors hover:text-accent"
                 >

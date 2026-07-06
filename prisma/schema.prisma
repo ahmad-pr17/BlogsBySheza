@@ -36,3 +36,11 @@ model Setting {
   key   String @id
   value String
 }
+
+model Sticker {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  category  String   @default("retro")
+  createdAt DateTime @default(now())
+}
