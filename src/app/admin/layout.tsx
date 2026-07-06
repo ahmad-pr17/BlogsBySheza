@@ -37,6 +37,12 @@ export default async function AdminLayout({
                   Stickers
                 </Link>
                 <Link
+                  href="/admin/songs"
+                  className="text-foreground/60 transition-colors hover:text-accent"
+                >
+                  Songs
+                </Link>
+                <Link
                   href="/admin/settings"
                   className="text-foreground/60 transition-colors hover:text-accent"
                 >

@@ -5,6 +5,7 @@ import { getTitleStyle } from "@/lib/settings";
 const NAV_LINKS = [
   { href: "/", label: "Blog" },
   { href: "/about", label: "About" },
+  { href: "/song", label: "Song" },
   { href: "/admin", label: "Admin" },
 ];
 

@@ -24,8 +24,17 @@ export async function POST(request: Request): Promise<NextResponse> {
             "image/webp",
             "image/gif",
             "image/avif",
+            // Audio, for the Song library.
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/wav",
+            "audio/ogg",
+            "audio/aac",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/webm",
           ],
-          maximumSizeInBytes: 15 * 1024 * 1024, // 15 MB
+          maximumSizeInBytes: 50 * 1024 * 1024, // 50 MB (songs are bigger than GIFs)
           addRandomSuffix: true,
         };
       },

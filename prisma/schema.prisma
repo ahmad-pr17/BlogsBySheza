@@ -44,3 +44,11 @@ model Sticker {
   category  String   @default("retro")
   createdAt DateTime @default(now())
 }
+
+model Song {
+  id        String   @id @default(cuid())
+  title     String
+  artist    String   @default("Unknown")
+  url       String
+  createdAt DateTime @default(now())
+}

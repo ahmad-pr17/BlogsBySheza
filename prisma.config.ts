@@ -10,6 +10,11 @@ export default defineConfig({
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // The Prisma CLI (migrate/generate) needs a DIRECT, non-pooled connection.
+    // Neon's pooler (PgBouncer) can't hold the session-level advisory lock that
+    // `migrate deploy` acquires, which causes P1002 timeouts during the build.
+    // The runtime client (src/lib/db.ts) still uses the pooled DATABASE_URL.
+    // DIRECT_URL is the same connection string with "-pooler" removed from host.
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });
