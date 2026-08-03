@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Panel } from "@/components/Panel";
 import { SongPlayer } from "@/components/SongPlayer";
-import { getSongs } from "@/lib/songs";
+import { getAllSongs } from "@/lib/songs";
 
 export const dynamic = "force-dynamic";
 
@@ -10,17 +10,8 @@ export const metadata: Metadata = {
   description: "A song to set the mood while you read.",
 };
 
-// The committed default track (lives in public/songs/). Always shown first.
-const DEFAULT_SONG = {
-  id: "default",
-  title: "Magical Fantasy",
-  artist: "Dmitriy",
-  url: "/songs/magical-fantasy.mp3",
-};
-
 export default async function SongPage() {
-  const uploaded = await getSongs();
-  const songs = [DEFAULT_SONG, ...uploaded];
+  const songs = await getAllSongs();
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-12">
