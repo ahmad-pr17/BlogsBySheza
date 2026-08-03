@@ -3,7 +3,17 @@
 // ReactionBar. The DB query lives in lib/reactionCounts.ts.
 
 // The fixed set of reactions readers can leave on a post, in display order.
-export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "😮"] as const;
+export const REACTION_EMOJIS = [
+  "👍",
+  "❤️",
+  "💙",
+  "💛",
+  "🐻",
+  "🦊",
+  "😂",
+  "🎉",
+  "😮",
+] as const;
 export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 
 export type ReactionCounts = Record<ReactionEmoji, number>;

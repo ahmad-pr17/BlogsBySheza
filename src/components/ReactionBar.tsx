@@ -36,6 +36,8 @@ export function ReactionBar({
   // external store on mount is a legitimate effect use here.
   const [mine, setMine] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<string | null>(null);
+  // Which emoji is mid tap-animation (cleared on animation end).
+  const [popping, setPopping] = useState<string | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of localStorage after mount
@@ -44,6 +46,14 @@ export function ReactionBar({
 
   async function toggle(emoji: ReactionEmoji) {
     if (pending) return;
+    // Tap feedback, independent of the network round-trip. Cleared by a timeout
+    // (not only onAnimationEnd) so a missed animation event can't leave the pop
+    // class stuck — which would stop the same emoji re-popping on the next tap.
+    setPopping(emoji);
+    window.setTimeout(
+      () => setPopping((p) => (p === emoji ? null : p)),
+      260,
+    );
     const has = mine.has(emoji);
     const op = has ? "remove" : "add";
 
@@ -104,8 +114,22 @@ export function ReactionBar({
               color: "var(--ink)",
             }}
           >
-            <span className="text-base leading-none">{emoji}</span>
-            <span className="tabular-nums" style={{ color: "var(--ink-muted)" }}>
+            <span
+              className={`inline-block text-base leading-none ${
+                popping === emoji ? "reaction-pop" : ""
+              }`}
+              onAnimationEnd={() =>
+                setPopping((p) => (p === emoji ? null : p))
+              }
+            >
+              {emoji}
+            </span>
+            <span
+              className={`inline-block tabular-nums ${
+                popping === emoji ? "reaction-count-bump" : ""
+              }`}
+              style={{ color: "var(--ink-muted)" }}
+            >
               {counts[emoji]}
             </span>
           </button>

@@ -1,8 +1,10 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { PostEntry } from "@/components/PostEntry";
+import { ReactionBar } from "@/components/ReactionBar";
 import { formatPostDate } from "@/lib/format";
 import type { PostModel } from "@/generated/prisma/models/Post";
+import type { ReactionCounts } from "@/lib/reactions";
 
 type Comment = {
   id: string;
@@ -71,9 +73,11 @@ function Bubble({
 export function PostWithComments({
   post,
   comments,
+  reactionCounts,
 }: {
   post: PostModel;
   comments: Comment[];
+  reactionCounts: ReactionCounts;
 }) {
   const left = comments.filter((_, i) => i % 2 === 0);
   const right = comments.filter((_, i) => i % 2 === 1);
@@ -89,9 +93,12 @@ export function PostWithComments({
         ))}
       </div>
 
-      {/* Center: the post + a compact comment caption */}
+      {/* Center: the post, a reaction bar, and a compact comment caption */}
       <div className="order-1 mx-auto flex w-full max-w-3xl flex-col gap-3 xl:order-2 xl:max-w-none">
         <PostEntry post={post} />
+        <div className="px-1">
+          <ReactionBar postId={post.id} initial={reactionCounts} />
+        </div>
         <p className="px-1 text-xs text-foreground/60">
           {hasComments ? (
             <>💬 {comments.length} comment{comments.length === 1 ? "" : "s"} · </>

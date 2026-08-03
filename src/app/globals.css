@@ -419,3 +419,44 @@ body {
     animation: none;
   }
 }
+
+/* ---------- reaction tap feedback ---------- */
+/* Fires once per click (never loops): the emoji bounces and the count ticks. */
+.reaction-pop {
+  display: inline-block;
+  animation: reaction-pop 220ms ease-out;
+}
+@keyframes reaction-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.35) rotate(-6deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.reaction-count-bump {
+  display: inline-block;
+  animation: reaction-count-bump 220ms ease-out;
+}
+@keyframes reaction-count-bump {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-3px) scale(1.18);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reaction-pop,
+  .reaction-count-bump {
+    animation: none;
+  }
+}

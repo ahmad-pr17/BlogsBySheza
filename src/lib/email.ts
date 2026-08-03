@@ -92,19 +92,27 @@ function escapeHtml(s: string): string {
 
 type PostLike = { title: string; slug: string; excerpt: string | null };
 
+// OWNER_EMAIL may hold several addresses, comma-separated — all get notified.
+function ownerEmails(): string[] {
+  return (process.env.OWNER_EMAIL || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export async function notifyOwnerOfComment(
   post: PostLike,
   comment: { author: string; body: string },
 ): Promise<void> {
-  const owner = process.env.OWNER_EMAIL;
-  if (!owner) {
+  const owners = ownerEmails();
+  if (owners.length === 0) {
     console.warn("[email] no OWNER_EMAIL set — comment notification skipped.");
     return;
   }
 
   const url = `${siteUrl()}/blog/${post.slug}#comments`;
   await send({
-    to: owner,
+    to: owners,
     subject: `New comment on "${post.title}"`,
     html: `
       <h2>New comment on "${escapeHtml(post.title)}"</h2>
