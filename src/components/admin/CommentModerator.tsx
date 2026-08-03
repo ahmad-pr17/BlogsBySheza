@@ -51,7 +51,7 @@ export function CommentModerator({ initial }: { initial: Comment[] }) {
                 </Link>
               </span>
             </p>
-            <p className="mt-1 whitespace-pre-wrap text-foreground/80">
+            <p className="mt-1 break-words whitespace-pre-wrap text-foreground/80">
               {c.body}
             </p>
             <p className="mt-1 text-xs text-foreground/40">

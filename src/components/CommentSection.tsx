@@ -81,7 +81,7 @@ export function CommentSection({
                 </span>
               </p>
               <p
-                className="mt-1 whitespace-pre-wrap leading-relaxed"
+                className="mt-1 leading-relaxed break-words whitespace-pre-wrap"
                 style={{ color: "var(--ink-body)" }}
               >
                 {c.body}

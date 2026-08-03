@@ -77,9 +77,13 @@ const components: Components = {
 };
 
 export function MarkdownContent({ content }: { content: string }) {
+  // break-words (overflow-wrap) is inherited, so a very long space-less string
+  // in any child element wraps instead of overflowing the panel.
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-      {content}
-    </ReactMarkdown>
+    <div className="break-words">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }
