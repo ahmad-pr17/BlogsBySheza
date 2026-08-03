@@ -43,6 +43,12 @@ export default async function AdminLayout({
                   Songs
                 </Link>
                 <Link
+                  href="/admin/comments"
+                  className="text-foreground/60 transition-colors hover:text-accent"
+                >
+                  Comments
+                </Link>
+                <Link
                   href="/admin/settings"
                   className="text-foreground/60 transition-colors hover:text-accent"
                 >

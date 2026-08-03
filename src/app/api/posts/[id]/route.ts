@@ -3,6 +3,7 @@ import { Status } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/session";
 import { generateUniqueSlug } from "@/lib/slug";
+import { announceToSubscribers } from "@/lib/subscribers";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -32,8 +33,16 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 
   const body = await request.json().catch(() => null);
-  const { title, content, excerpt, category, author, coverImage, status } =
-    body ?? {};
+  const {
+    title,
+    content,
+    excerpt,
+    category,
+    author,
+    coverImage,
+    status,
+    notifySubscribers,
+  } = body ?? {};
 
   if (typeof title !== "string" || !title.trim()) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -71,6 +80,19 @@ export async function PUT(request: Request, { params }: RouteParams) {
     },
   });
 
+  // Email logic on save:
+  //   • draft → published  = a "new post" announcement
+  //   • published → published = an "updated" announcement, only if the admin
+  //     ticked the notify box (so routine edits don't spam subscribers)
+  if (nextStatus === Status.PUBLISHED) {
+    const wasPublished = existing.status === Status.PUBLISHED;
+    if (!wasPublished) {
+      await announceToSubscribers(post, "new");
+    } else if (notifySubscribers === true) {
+      await announceToSubscribers(post, "updated");
+    }
+  }
+
   return NextResponse.json(post);
 }
 
@@ -104,6 +126,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     where: { id },
     data: { status, publishedAt },
   });
+
+  // Going live (draft → published) announces the new post to subscribers.
+  if (status === Status.PUBLISHED && existing.status !== Status.PUBLISHED) {
+    await announceToSubscribers(post, "new");
+  }
 
   return NextResponse.json(post);
 }

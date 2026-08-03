@@ -19,6 +19,7 @@ export function PostForm({ mode, post }: Props) {
   const [excerpt, setExcerpt] = useState(post?.excerpt ?? "");
   const [coverImage, setCoverImage] = useState(post?.coverImage ?? "");
   const [content, setContent] = useState(post?.content ?? "");
+  const [notify, setNotify] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -69,6 +70,7 @@ export function PostForm({ mode, post }: Props) {
     excerpt: excerpt || undefined,
     coverImage: coverImage || undefined,
     content,
+    notifySubscribers: notify,
   });
 
   async function createPost(status: Status) {
@@ -234,6 +236,19 @@ export function PostForm({ mode, post }: Props) {
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <label className="flex items-center gap-2 text-sm text-foreground/80">
+        <input
+          type="checkbox"
+          checked={notify}
+          onChange={(e) => setNotify(e.target.checked)}
+          className="accent-accent"
+        />
+        Email subscribers when this{" "}
+        {mode === "edit" && post.status === Status.PUBLISHED
+          ? "update is saved"
+          : "post is published"}
+      </label>
 
       <div className="flex flex-wrap items-center gap-3">
         {mode === "new" ? (

@@ -42,7 +42,13 @@ export function PostEntry({
         <p className="mt-5 text-xs" style={{ color: "var(--ink-muted)" }}>
           Categories:{" "}
           <span style={{ color: "var(--link)" }}>{post.category}</span> ·{" "}
-          <span style={{ color: "var(--link)" }}>Leave a comment</span>
+          <Link
+            href={`/blog/${post.slug}#comments`}
+            className="transition-opacity hover:opacity-75"
+            style={{ color: "var(--link)" }}
+          >
+            Leave a comment
+          </Link>
         </p>
       </article>
     </Panel>

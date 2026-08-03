@@ -3,6 +3,7 @@ import { Status } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/session";
 import { generateUniqueSlug } from "@/lib/slug";
+import { announceToSubscribers } from "@/lib/subscribers";
 
 export async function GET(request: Request) {
   if (!(await isAdminAuthenticated())) {
@@ -30,8 +31,16 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
-  const { title, content, excerpt, category, author, coverImage, status } =
-    body ?? {};
+  const {
+    title,
+    content,
+    excerpt,
+    category,
+    author,
+    coverImage,
+    status,
+    notifySubscribers,
+  } = body ?? {};
 
   if (typeof title !== "string" || !title.trim()) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -59,6 +68,11 @@ export async function POST(request: Request) {
       publishedAt: finalStatus === Status.PUBLISHED ? new Date() : null,
     },
   });
+
+  // Email subscribers about the brand-new post (unless the admin opted out).
+  if (finalStatus === Status.PUBLISHED && notifySubscribers !== false) {
+    await announceToSubscribers(post, "new");
+  }
 
   return NextResponse.json(post, { status: 201 });
 }
