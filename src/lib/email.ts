@@ -125,6 +125,30 @@ export async function notifyOwnerOfComment(
   });
 }
 
+export async function notifyOwnerOfReaction(
+  post: PostLike,
+  emoji: string,
+  total: number,
+): Promise<void> {
+  const owners = ownerEmails();
+  if (owners.length === 0) {
+    console.warn("[email] no OWNER_EMAIL set — reaction notification skipped.");
+    return;
+  }
+
+  const url = `${siteUrl()}/blog/${post.slug}`;
+  await send({
+    to: owners,
+    subject: `${emoji} New reaction on "${post.title}"`,
+    html: `
+      <h2>${emoji} New reaction on "${escapeHtml(post.title)}"</h2>
+      <p>Someone reacted with <span style="font-size:24px">${emoji}</span>
+      (${total} total for this emoji).</p>
+      <p><a href="${url}">View the post</a></p>
+    `,
+  });
+}
+
 type Subscriber = { email: string; token: string };
 
 function subscriberEmailHtml(

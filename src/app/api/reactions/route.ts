@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { notifyOwnerOfReaction } from "@/lib/email";
 import { getReactionCounts } from "@/lib/reactionCounts";
 import { isReactionEmoji } from "@/lib/reactions";
 
@@ -24,11 +25,19 @@ export async function POST(request: Request) {
   }
 
   if (direction === 1) {
-    await prisma.reaction.upsert({
+    const reaction = await prisma.reaction.upsert({
       where: { postId_emoji: { postId, emoji } },
       create: { postId, emoji, count: 1 },
       update: { count: { increment: 1 } },
     });
+
+    // Fire-and-forget owner notification — only when a reaction is added,
+    // never on removal, and never let email failure break reacting.
+    notifyOwnerOfReaction(
+      { title: post.title, slug: post.slug, excerpt: post.excerpt },
+      emoji,
+      reaction.count,
+    ).catch((err) => console.error("[reactions] notify failed:", err));
   } else {
     // Only decrement an existing row, and clamp at 0.
     const existing = await prisma.reaction.findUnique({
