@@ -1,64 +1,36 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useSyncExternalStore } from "react";
+import { playerBus } from "@/lib/playerBus";
 
+// One row of the song list. It has no audio of its own: it plays / pauses this
+// track on the floating player, so only one song ever plays and the music keeps
+// going after the popup closes.
 export function SongPlayer({
-  src,
+  id,
   title,
   artist,
 }: {
-  src: string;
+  id: string;
   title: string;
   artist: string;
 }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [muted, setMuted] = useState(true);
-
-  // When another player starts, reflect that this one is now muted.
-  useEffect(() => {
-    function onOtherPlay(e: Event) {
-      const startedSrc = (e as CustomEvent<string>).detail;
-      if (startedSrc !== src) setMuted(true);
-    }
-    window.addEventListener("songplayer:play", onOtherPlay);
-    return () => window.removeEventListener("songplayer:play", onOtherPlay);
-  }, [src]);
-
-  function toggle() {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const next = !muted;
-    setMuted(next);
-    audio.muted = next;
-
-    // Unmuting counts as the user gesture that lets playback start. Radio-style:
-    // pause + mute every other track on the page so only one plays at a time.
-    if (!next) {
-      document.querySelectorAll("audio").forEach((el) => {
-        if (el !== audio) {
-          el.muted = true;
-          el.pause();
-        }
-      });
-      window.dispatchEvent(new CustomEvent("songplayer:play", { detail: src }));
-      if (audio.paused) {
-        audio.play().catch(() => {
-          /* autoplay blocked — button click will retry */
-        });
-      }
-    }
-  }
+  const state = useSyncExternalStore(
+    playerBus.subscribe,
+    playerBus.getState,
+    playerBus.getState,
+  );
+  const playing = state.currentId === id && state.playing;
 
   return (
     <div className="flex items-center gap-3">
       <button
         type="button"
-        onClick={toggle}
-        aria-pressed={!muted}
-        aria-label={muted ? `Unmute ${title}` : `Mute ${title}`}
-        title={muted ? "Unmute" : "Mute"}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition"
+        onClick={() => playerBus.pick(id)}
+        aria-pressed={playing}
+        aria-label={playing ? `Pause ${title}` : `Play ${title}`}
+        title={playing ? "Pause" : "Play"}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition active:scale-95"
         style={{
           background: "var(--menu-bar)",
           border: "3px solid var(--wood-dark)",
@@ -66,56 +38,35 @@ export function SongPlayer({
           color: "#5c3416",
         }}
       >
-        {muted ? <SpeakerMutedIcon /> : <SpeakerOnIcon />}
+        {playing ? <PauseIcon /> : <PlayIcon />}
       </button>
       <p style={{ color: "var(--ink)" }}>
         <span className="font-semibold">{title}</span>
         {" — "}
         {artist}
+        {playing && (
+          <span className="ml-2 text-sm" style={{ color: "#7a4a22" }}>
+            ♪ now playing
+          </span>
+        )}
       </p>
-
-      {/* Loops while playing; the button controls mute/unmute (and playback). */}
-      <audio ref={audioRef} src={src} loop muted preload="none" />
     </div>
   );
 }
 
-function SpeakerOnIcon() {
+function PlayIcon() {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
-      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
     </svg>
   );
 }
 
-function SpeakerMutedIcon() {
+function PauseIcon() {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-      <line x1="16" y1="9" x2="22" y2="15" />
-      <line x1="22" y1="9" x2="16" y2="15" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
     </svg>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { playerBus } from "@/lib/playerBus";
 
 type Song = { id: string; title: string; artist: string; url: string };
 
@@ -32,6 +33,19 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
     };
+  }, []);
+
+  // Share state with the Song list and let it play / pause tracks here.
+  useEffect(() => {
+    playerBus.setState({ currentId, playing });
+  }, [currentId, playing]);
+  const pickRef = useRef<(id: string) => void>(() => {});
+  useEffect(() => {
+    pickRef.current = pick;
+  });
+  useEffect(() => {
+    playerBus.setPickHandler((id) => pickRef.current(id));
+    return () => playerBus.setPickHandler(null);
   }, []);
 
   // Apply volume to the element.
@@ -74,6 +88,7 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
   function toggle() {
     const audio = audioRef.current;
     if (!audio) return;
+    audio.muted = false;
     if (audio.paused) {
       audio.play().catch(() => {});
     } else {

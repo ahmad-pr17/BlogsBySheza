@@ -19,7 +19,7 @@ export function SongContent({ songs }: { songs: Songs }) {
         <ul className="space-y-3">
           {songs.map((song) => (
             <li key={song.id}>
-              <SongPlayer src={song.url} title={song.title} artist={song.artist} />
+              <SongPlayer id={song.id} title={song.title} artist={song.artist} />
             </li>
           ))}
         </ul>
