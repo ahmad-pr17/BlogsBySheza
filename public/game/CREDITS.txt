@@ -1,0 +1,10 @@
+Art credits
+-----------
+Tiles, trees, bushes, flowers, houses, fences, campfire, benches and the
+character sprites in this folder are from "Sprout Lands" by Cup Nooble.
+  Assets - From: Sprout Lands - By: Cup Nooble
+  https://cupnooble.itch.io/sprout-lands-asset-pack
+
+License (free Basic pack): may be modified; non-commercial projects only; no
+NFT or AI-training use; the pack itself may not be redistributed or resold;
+credit is required. Only the individual sprites this game uses are included.

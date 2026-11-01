@@ -58,6 +58,7 @@ export default async function AdminLayout({
             )}
             <Link
               href="/"
+              target="_top"
               className="text-foreground/60 transition-colors hover:text-accent"
             >
               View site ↗

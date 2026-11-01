@@ -460,3 +460,418 @@ body {
     animation: none;
   }
 }
+
+/* ---------- trail game (homepage): full-screen Sprout Lands world ---------- */
+html.game-lock,
+body.game-lock {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.g-root {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: #bfd46e;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.g-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* wooden HUD panels */
+.g-title,
+.g-nav,
+.g-hint {
+  position: absolute;
+  z-index: 2;
+  font-family: var(--font-pixelify), monospace;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #f0c48c,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.g-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: #bfd46e;
+  color: #3a2a18;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 20px;
+}
+.g-credit {
+  position: absolute;
+  z-index: 2;
+  bottom: 12px;
+  left: 12px;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(53, 55, 56, 0.8), 1px 0 0 rgba(53, 55, 56, 0.8);
+  text-decoration: none;
+  opacity: 0.85;
+}
+.g-credit:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.g-title {
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  line-height: 1.15;
+  pointer-events: none;
+}
+.g-title strong {
+  font-size: 18px;
+}
+.g-title span {
+  font-size: 13px;
+  color: #6b4a22;
+}
+.g-nav {
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+}
+.g-nav a {
+  padding: 6px 10px;
+  font-size: 15px;
+  color: #5c3416;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.g-nav a:hover,
+.g-nav a:focus-visible {
+  background: rgba(122, 74, 34, 0.18);
+  outline: none;
+}
+.g-hint {
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.g-prompt {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 58px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  background: var(--parchment-hi);
+  box-shadow:
+    inset 0 0 0 2px #f6dfb8,
+    0 3px 0 rgba(0, 0, 0, 0.4);
+  color: var(--ink);
+  font-family: var(--font-pixelify), monospace;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  animation: g-pop 0.15s ease-out;
+}
+.g-prompt kbd {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--wood);
+  color: var(--parchment-hi);
+  font-size: 12px;
+}
+@keyframes g-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+.g-joy {
+  position: absolute;
+  z-index: 3;
+  left: 18px;
+  bottom: 22px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(58, 42, 24, 0.35);
+  border: 3px solid rgba(240, 196, 140, 0.8);
+  touch-action: none;
+}
+.g-joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 50px;
+  height: 50px;
+  margin: -25px 0 0 -25px;
+  border-radius: 50%;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 0 0 2px #f0c48c;
+  pointer-events: none;
+}
+
+/* post modal */
+.game-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  background: rgba(8, 20, 12, 0.78);
+  padding: 1rem;
+  animation: modal-in 0.2s ease-out;
+  touch-action: pan-y;
+}
+.game-modal-body {
+  width: 100%;
+  max-width: 78rem;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.game-modal-close {
+  align-self: flex-start;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 3px solid var(--wood-dark);
+  background: var(--menu-bar);
+  box-shadow: inset 0 0 0 2px #f0c48c;
+  color: #3a2a18;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 15px;
+  cursor: pointer;
+}
+/* popup cards are solid so the trail doesn't show through the text */
+.game-modal .panel {
+  background: var(--parchment-hi);
+}
+
+/* admin popup */
+.admin-frame {
+  width: 100%;
+  height: calc(100vh - 6rem);
+  min-height: 24rem;
+  border: 4px solid var(--wood-dark);
+  border-radius: 8px;
+  background: #1d3a1f;
+  color-scheme: dark;
+}
+
+/* minimap: the whole trail, always visible */
+.g-map {
+  position: absolute;
+  z-index: 2;
+  top: 62px;
+  right: 10px;
+  padding: 3px;
+  box-sizing: content-box;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #f0c48c,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.g-map-off {
+  display: none;
+}
+
+/* short messages: cooked something, petted the cat, and so on */
+.g-toast {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 74px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 24px);
+  padding: 8px 16px;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 15px;
+  text-align: center;
+  color: var(--ink);
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #f6dfb8,
+    0 3px 0 rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: g-pop 0.15s ease-out;
+}
+
+/* instructions corner */
+.g-help {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  bottom: 34px;
+  max-width: min(260px, calc(100vw - 20px));
+  font-family: var(--font-pixelify), monospace;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #f0c48c,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.g-help-touch {
+  bottom: auto;
+  top: 66px;
+}
+.g-help-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px 10px;
+  background: none;
+  border: 0;
+  color: #5c3416;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.g-help ul {
+  margin: 0;
+  padding: 0 12px 8px;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* fox + bear reading along: they sit on the top edge of the post card */
+.readers {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 48rem;
+  margin: 0.25rem auto -0.9rem;
+  padding: 0 0.75rem;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+.reader {
+  --rw: 96px; /* canvas is 48px wide: keep this a multiple of 48 */
+  width: var(--rw);
+  height: auto;
+  image-rendering: pixelated;
+  animation: reader-bob 3.2s ease-in-out infinite;
+}
+.reader-bear {
+  animation-delay: -1.4s;
+}
+@keyframes reader-bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+/* wide screens (1100px+): they sit in the empty gaps left and right of the post card
+   (the card is 48rem = 768px wide and centred) */
+@media (min-width: 1100px) {
+  .readers {
+    display: contents;
+  }
+  .reader {
+    --rw: 144px;
+    position: fixed;
+    top: 42%; /* clear of the floating music player at the bottom right */
+  }
+  .reader-fox {
+    left: calc((50% - 384px - var(--rw)) / 2);
+  }
+  .reader-bear {
+    right: calc((50% - 384px - var(--rw)) / 2);
+  }
+}
+@media (min-width: 1500px) {
+  .reader {
+    --rw: 192px;
+  }
+}
+@media (min-width: 1900px) {
+  .reader {
+    --rw: 240px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reader {
+    animation: none;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (max-width: 640px) {
+  .game-modal {
+    padding: 0.5rem;
+  }
+  .g-title strong {
+    font-size: 15px;
+  }
+  .g-nav a {
+    padding: 6px 7px;
+    font-size: 13px;
+  }
+  .g-prompt {
+    bottom: 160px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-modal,
+  .g-prompt {
+    animation: none;
+  }
+}
+
+@media (hover: none) {
+  .g-credit {
+    bottom: 150px;
+  }
+}
