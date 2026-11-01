@@ -344,8 +344,7 @@ export function drawHomeScene(
   world: World,
   s: HomeDrawState,
   t: number,
-  drawPlayer: (hidden: boolean) => void,
-  playerY: number,
+  actors: { y: number; draw: () => void }[], // players, sorted by y
 ) {
   // sky behind the wall, then the room
   sky(c, s.night, t);
@@ -396,21 +395,18 @@ export function drawHomeScene(
   };
   for (const o of world.objects) if (o.flat) drawObj(o);
 
-  // furniture and the player, back to front
-  let drawn = false;
+  // furniture and the players, back to front
+  let ai = 0;
   for (const o of world.objects) {
     if (o.flat) continue;
-    if (!drawn && o.y > playerY) {
-      drawPlayer(s.sleeping);
-      drawn = true;
-    }
+    while (ai < actors.length && o.y > actors[ai].y) actors[ai++].draw();
     drawObj(o);
     if (o.key === "f_table" && s.dish) {
       const d = art.sprites[s.dish] as Img;
       c.drawImage(d, 243, 152 - d.height - 7);
     }
   }
-  if (!drawn) drawPlayer(s.sleeping);
+  while (ai < actors.length) actors[ai++].draw();
 
   // someone asleep in the bed
   if (s.sleeping) {

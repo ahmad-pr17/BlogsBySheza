@@ -26,10 +26,9 @@ export default async function Home({
   const { view, post: postParam, page: pageParam } = await searchParams;
   const listView = view === "list";
   const initialSlug = typeof postParam === "string" ? postParam : undefined;
+  // (The admin popup has no deep link: it exists only for the owner, inside the game.)
   const initialPage =
-    pageParam === "about" || pageParam === "song" || pageParam === "admin"
-      ? pageParam
-      : undefined;
+    pageParam === "about" || pageParam === "song" ? pageParam : undefined;
 
   const posts = await getPublishedPosts();
   const postIds = posts.map((p) => p.id);
@@ -80,10 +79,6 @@ export default async function Home({
   );
   nodes.__about = <AboutContent />;
   nodes.__song = <SongContent songs={await getAllSongs()} />;
-  // The admin site lives in a frame so its own login and pages work unchanged.
-  nodes.__admin = (
-    <iframe src="/admin" title="Admin" className="admin-frame" />
-  );
   nodes.__subscribe = (
     <div className="mx-auto w-full max-w-md rounded-xl border-4 border-wood bg-night/95 p-6">
       <h2 className="mb-3 text-center text-xl font-semibold text-heading">

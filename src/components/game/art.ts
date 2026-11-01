@@ -1,3 +1,4 @@
+import { buildAnimalSheet } from "@/components/game/animals";
 import { homeProps } from "@/components/game/homeArt";
 
 // Art: tiles and sprites come from the "Sprout Lands" pack by Cup Nooble
@@ -12,6 +13,8 @@ export type Art = {
   dirt: HTMLImageElement;
   water: HTMLImageElement;
   char: HTMLImageElement;
+  // walking sheets by character: farmer has one per shirt colour, the rest one each
+  chars: Record<string, Img[]>;
   sprites: Record<string, Img | Img[]>;
 };
 
@@ -135,6 +138,63 @@ function drawnProps(): Record<string, Img> {
   };
 }
 
+// Recolour only the green clothes of the character sheet.
+// [hue in degrees, brightness shift] for each farmer shirt colour
+const TINT_HUES: [number, number][] = [
+  [52, 0.04], // yellow
+  [196, 0.13], // sky blue
+  [335, 0.02], // pink: Sheza only
+];
+
+function rgb2hsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const l = (mx + mn) / 2;
+  const d = mx - mn;
+  if (d === 0) return [0, 0, l];
+  const sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h =
+    mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, sat, l];
+}
+
+function hsl2rgb(h: number, sat: number, l: number): [number, number, number] {
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = sat * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+
+function tintChar(img: HTMLImageElement, hue: number, lift: number): Img {
+  const cv = document.createElement("canvas");
+  cv.width = img.width;
+  cv.height = img.height;
+  const c = cv.getContext("2d")!;
+  c.imageSmoothingEnabled = false;
+  c.drawImage(img, 0, 0);
+  if (hue === 0) return cv;
+  const data = c.getImageData(0, 0, cv.width, cv.height);
+  const d = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    if (g > r + 8 && g > b + 8) {
+      const [, sat, l] = rgb2hsl(r, g, b);
+      const [nr, ng, nb] = hsl2rgb(hue, Math.min(1, sat * 1.15), Math.min(0.92, l + lift));
+      d[i] = nr;
+      d[i + 1] = ng;
+      d[i + 2] = nb;
+    }
+  }
+  c.putImageData(data, 0, 0);
+  return cv;
+}
+
 export async function loadArt(): Promise<Art> {
   const base = "/game/";
   const [grass, dirt, water, char, ...imgs] = await Promise.all([
@@ -166,5 +226,13 @@ export async function loadArt(): Promise<Art> {
   for (const n of FILES) if (n.startsWith("f_")) sprites[n] = raw[n];
   sprites.campfire = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => raw[`campfire${i}`]);
 
-  return { grass, dirt, water, char, sprites };
+  const chars: Record<string, Img[]> = {
+    farmer: TINT_HUES.map(([h, lift]) => tintChar(char, h, lift)),
+    fox: [buildAnimalSheet("fox")],
+    bear: [buildAnimalSheet("bear")],
+    bunny: [buildAnimalSheet("bunny")],
+    frog: [buildAnimalSheet("frog")],
+    chicken: [buildAnimalSheet("chicken")],
+  };
+  return { grass, dirt, water, char, chars, sprites };
 }

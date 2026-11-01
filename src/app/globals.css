@@ -713,6 +713,382 @@ body.game-lock {
   pointer-events: none;
 }
 
+/* ---- entry screen (login) ---- */
+.g-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow-y: auto;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 244, 200, 0.18), transparent 60%),
+    rgba(14, 30, 18, 0.78);
+  font-family: var(--font-pixelify), monospace;
+  touch-action: pan-y;
+}
+.g-gate-card {
+  width: min(440px, 100%);
+  padding: 22px 22px 18px;
+  text-align: center;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 4px solid var(--wood-dark);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 3px #f0c48c,
+    0 6px 0 rgba(0, 0, 0, 0.4);
+}
+.g-gate-kicker {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7a4a22;
+}
+.g-gate-title {
+  margin: 2px 0 6px;
+  font-size: clamp(32px, 9vw, 46px);
+  line-height: 1.05;
+  color: #5c3416;
+  text-shadow: 0 2px 0 #f6dfb8;
+}
+.g-gate-sub {
+  margin: 0 0 16px;
+  font-size: 15px;
+  color: #6b4a22;
+}
+.g-gate-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: #7a4a22;
+}
+.g-gate-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.g-gate-btn {
+  min-height: 46px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 17px;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #f6dfb8,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.g-gate-btn:hover:not(:disabled),
+.g-gate-btn:focus-visible {
+  outline: none;
+  background: #fff3d2;
+  transform: translateY(-1px);
+}
+.g-gate-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.g-gate-primary {
+  background: #f6c453;
+  box-shadow:
+    inset 0 0 0 2px #fde39a,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.g-gate-primary:hover:not(:disabled),
+.g-gate-primary:focus-visible {
+  background: #ffd36a;
+}
+.g-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.g-gate-form label {
+  font-size: 14px;
+  color: #6b4a22;
+}
+.g-gate-form input {
+  min-height: 44px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 16px;
+  color: #3a2a18;
+  background: #fffbea;
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+}
+.g-gate-form input:focus-visible {
+  outline: 3px solid #f6c453;
+}
+.g-gate-err {
+  margin: 0;
+  font-size: 14px;
+  color: #a1352a;
+}
+
+/* character picker (shirt colours, name) */
+.g-pick-title {
+  margin: 0 0 10px;
+  font-size: 17px;
+  color: #5c3416;
+}
+.g-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.g-pick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px 4px;
+  font: inherit;
+  font-size: 12px;
+  color: #5c3416;
+  background: rgba(255, 251, 234, 0.55);
+  border: 3px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-pick-card:hover,
+.g-pick-card:focus-visible {
+  outline: none;
+  background: #fff3d2;
+}
+.g-pick-card.on {
+  background: #fff3d2;
+  border-color: #c9803e;
+  box-shadow: 0 0 0 2px #f6c453;
+}
+/* Sheza's picker: two cards */
+.g-pick-two {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 220px;
+  margin: 0 auto;
+}
+.g-char-prev {
+  width: 48px;
+  height: 96px;
+  image-rendering: pixelated;
+}
+.g-pick-tints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.g-tint {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--wood-dark);
+  cursor: pointer;
+}
+.g-tint.t0 { background: #f2d14b; }
+.g-tint.t1 { background: #8fd3f4; }
+.g-tint.t2 { background: #f29ab6; }
+.g-tint.on {
+  box-shadow: 0 0 0 3px #f6c453;
+}
+.g-name-label {
+  display: block;
+  margin: 4px 0 4px;
+  font-size: 14px;
+  text-align: left;
+  color: #6b4a22;
+}
+.g-name-label span {
+  color: #8a6a3a;
+  font-size: 12px;
+}
+.g-name {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 16px;
+  color: #3a2a18;
+  background: #fffbea;
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+}
+.g-name:focus-visible {
+  outline: 3px solid #f6c453;
+}
+.g-pick .g-gate-btns {
+  margin-top: 10px;
+}
+
+/* emotes and superadmin buttons */
+.g-bar {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 2px #f0c48c,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.g-bar-touch {
+  left: auto;
+  right: 10px;
+  bottom: auto;
+  top: calc(62px + 40vh + 24px);
+  transform: none;
+  flex-direction: column;
+}
+.g-emote {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  line-height: 1;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-emote:hover,
+.g-emote:focus-visible {
+  outline: none;
+  background: #fff3d2;
+}
+.g-emote-panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 290px;
+  padding: 8px;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 2px #f0c48c,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.g-bar-touch .g-emote-panel {
+  bottom: auto;
+  top: 0;
+  left: auto;
+  right: calc(100% + 8px);
+  transform: none;
+  width: min(250px, calc(100vw - 80px));
+}
+.g-emote-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+}
+.g-emote-grid .g-emote {
+  width: 100%;
+}
+.g-chat {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  width: min(340px, calc(100vw - 20px));
+  padding: 6px;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 2px #f0c48c,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.g-chat input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 16px;
+  color: #3a2a18;
+  background: #fffbea;
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+}
+.g-chat input:focus-visible {
+  outline: 3px solid #f6c453;
+}
+.g-chat-send {
+  padding: 0 14px;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 15px;
+  color: #5c3416;
+  background: #f6c453;
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-chat-send:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.g-bar-touch .g-chat {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  top: auto;
+  width: auto;
+  transform: none;
+}
+.g-action-row {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+.g-action {
+  flex: 1;
+  min-height: 40px;
+  padding: 4px 6px;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 14px;
+  color: #5c3416;
+  background: #fde39a;
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-action:hover,
+.g-action:focus-visible {
+  outline: none;
+  background: #ffd36a;
+}
+.g-more.on {
+  background: #fde39a;
+}
+.g-super {
+  background: #fde39a;
+}
+.g-super.on {
+  background: #f6c453;
+  box-shadow: inset 0 0 0 2px #fff3d2;
+}
+.g-map-tp {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
 .g-map-off {
   display: none;
 }
@@ -738,6 +1114,26 @@ body.game-lock {
     0 3px 0 rgba(0, 0, 0, 0.4);
   pointer-events: none;
   animation: g-pop 0.15s ease-out;
+}
+
+/* minimize button on the top menu (menu and music player start minimized) */
+.g-nav-toggle {
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 15px;
+  color: #5c3416;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.g-nav-toggle:hover,
+.g-nav-toggle:focus-visible {
+  background: rgba(122, 74, 34, 0.18);
+  outline: none;
+}
+.g-nav-min {
+  padding: 2px 4px;
 }
 
 /* instructions corner */

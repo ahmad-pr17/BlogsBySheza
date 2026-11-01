@@ -18,6 +18,9 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Starts minimized (just a play/pause button) for a clearer view; the music
+  // keeps playing either way.
+  const [minimized, setMinPref] = useState(true);
 
   const current = songs.find((s) => s.id === currentId) ?? songs[0];
 
@@ -112,7 +115,11 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
   return (
     <div
       ref={containerRef}
-      className="fixed right-4 bottom-4 z-40 w-60 rounded-xl px-3 py-2.5"
+      className={
+        minimized
+          ? "fixed right-4 bottom-4 z-40 flex items-center gap-1 rounded-full p-1.5"
+          : "fixed right-4 bottom-4 z-40 w-60 rounded-xl px-3 py-2.5"
+      }
       style={{
         background: "var(--menu-bar)",
         border: "3px solid var(--wood-dark)",
@@ -120,6 +127,35 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
         color: "#5c3416",
       }}
     >
+      {minimized ? (
+        <>
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={playing ? `Pause ${current.title}` : `Play ${current.title}`}
+            title={playing ? "Pause" : "Play"}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95"
+            style={{
+              background: "var(--parchment-hi)",
+              border: "2px solid var(--wood-dark)",
+              color: "#5c3416",
+            }}
+          >
+            {playing ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMinPref(false)}
+            aria-label="Open music player"
+            title="Open player"
+            className="flex h-9 items-center justify-center px-1.5 text-sm"
+            style={{ color: "#5c3416", fontFamily: "var(--font-pixelify), monospace" }}
+          >
+            ♪ ▴
+          </button>
+        </>
+      ) : (
+        <>
       {/* Track row: play/pause + title (opens the song menu) */}
       <div className="flex items-center gap-2.5">
         <button
@@ -158,6 +194,19 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
             </span>
           </span>
           {hasLibrary && <CaretIcon open={menuOpen} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            setMinPref(true);
+          }}
+          aria-label="Minimize player"
+          title="Minimize"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-lg leading-none"
+          style={{ color: "#5c3416" }}
+        >
+          –
         </button>
       </div>
 
@@ -217,6 +266,9 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
             );
           })}
         </ul>
+      )}
+
+        </>
       )}
 
       <audio ref={audioRef} src={current.url} loop preload="none" />

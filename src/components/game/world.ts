@@ -60,7 +60,7 @@ export function pathCenter(row: number) {
 
 const PATH_HALF = 1.9;
 
-export function buildWorld(stops: Stop[]): World {
+export function buildWorld(stops: Stop[], adminHouse = false): World {
   const n = stops.length;
   const lastRow = R0 + Math.max(n - 1, 0) * GAP;
   const endRow = lastRow + GAP;
@@ -126,13 +126,16 @@ export function buildWorld(stops: Stop[]): World {
     { c: 34, key: "houseC" },
   ];
   for (const h of houses) {
+    // The Admin house is only a real door for the owner and superadmin; for
+    // visitors it is just another house (no sign, nothing to enter).
+    const live = !!h.id && (h.id !== "admin" || adminHouse);
     place(h.key, h.c, HOUSE_ROW, {
       blockTiles: [h.c - 2, h.c - 1, h.c, h.c + 1].flatMap(
         (c) => [[c, HOUSE_ROW - 1], [c, HOUSE_ROW]] as [number, number][],
       ),
-      interact: h.id,
+      interact: live ? h.id : undefined,
     });
-    if (!h.id) continue;
+    if (!live || !h.id) continue;
     interacts.push({
       id: h.id,
       kind: h.id === "home" ? "enter" : "modal",
@@ -346,7 +349,7 @@ export function tileBlocked(world: World, px: number, py: number) {
 }
 
 // ---- auto-walk: a tile path around obstacles, then straightened ----
-function footFree(world: World, x: number, y: number) {
+export function footFree(world: World, x: number, y: number) {
   return !(
     tileBlocked(world, x - 4, y) ||
     tileBlocked(world, x + 4, y) ||
