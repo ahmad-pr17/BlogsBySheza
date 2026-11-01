@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { notifyOwnerOfComment } from "@/lib/email";
 
@@ -38,10 +38,13 @@ export async function POST(request: Request) {
   });
 
   // Fire-and-forget owner notification — never let email failure break posting.
-  notifyOwnerOfComment(
-    { title: post.title, slug: post.slug, excerpt: post.excerpt },
-    { author: comment.author, body: comment.body },
-  ).catch((err) => console.error("[comments] notify failed:", err));
+  // `after` keeps the serverless function alive until the email is sent.
+  after(() =>
+    notifyOwnerOfComment(
+      { title: post.title, slug: post.slug, excerpt: post.excerpt },
+      { author: comment.author, body: comment.body },
+    ).catch((err) => console.error("[comments] notify failed:", err)),
+  );
 
   return NextResponse.json(comment, { status: 201 });
 }

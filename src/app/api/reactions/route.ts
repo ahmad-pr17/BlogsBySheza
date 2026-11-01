@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { notifyOwnerOfReaction } from "@/lib/email";
 import { getReactionCounts } from "@/lib/reactionCounts";
@@ -33,11 +33,14 @@ export async function POST(request: Request) {
 
     // Fire-and-forget owner notification — only when a reaction is added,
     // never on removal, and never let email failure break reacting.
-    notifyOwnerOfReaction(
-      { title: post.title, slug: post.slug, excerpt: post.excerpt },
-      emoji,
-      reaction.count,
-    ).catch((err) => console.error("[reactions] notify failed:", err));
+    // `after` keeps the serverless function alive until the email is sent.
+    after(() =>
+      notifyOwnerOfReaction(
+        { title: post.title, slug: post.slug, excerpt: post.excerpt },
+        emoji,
+        reaction.count,
+      ).catch((err) => console.error("[reactions] notify failed:", err)),
+    );
   } else {
     // Only decrement an existing row, and clamp at 0.
     const existing = await prisma.reaction.findUnique({
