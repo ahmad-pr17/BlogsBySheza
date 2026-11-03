@@ -71,6 +71,44 @@ const WOOD_L = "#d79e61";
 const PAPER = "#f3e5c2";
 const SHADOW = "rgba(53,55,56,0.22)";
 
+// A wooden notice board with a parchment face (the words are drawn on top by
+// GameWorld, so they stay sharp at any zoom).
+const boardArt = (w: number) => (c: Ctx) => {
+  ell(c, SHADOW, w / 2, 82, w / 2 - 9, 2);
+  // two posts
+  R(c, WOOD_D, 20, 66, 9, 17);
+  R(c, WOOD, 22, 66, 4, 17);
+  R(c, WOOD_D, w - 29, 66, 9, 17);
+  R(c, WOOD, w - 27, 66, 4, 17);
+  // the board: dark frame, light planks, parchment
+  R(c, WOOD_D, 0, 0, w, 70);
+  R(c, WOOD_L, 2, 2, w - 4, 66);
+  R(c, "#eeba77", 2, 2, w - 4, 2);
+  for (let x = 14; x < w - 2; x += 24) R(c, "#c98f58", x, 4, 1, 62);
+  R(c, WOOD_D, 5, 5, w - 10, 60);
+  R(c, PAPER, 7, 7, w - 14, 56);
+  R(c, "#e9d6a8", 7, 60, w - 14, 3);
+  // nails in the corners
+  for (const [nx, ny] of [[3, 3], [w - 5, 3], [3, 65], [w - 5, 65]]) R(c, "#545959", nx, ny, 2, 2);
+  // little hearts either side of the title
+  const heart = (hx: number, hy: number) => {
+    R(c, "#bd757e", hx + 1, hy, 2, 1);
+    R(c, "#bd757e", hx + 4, hy, 2, 1);
+    R(c, "#bd757e", hx, hy + 1, 7, 2);
+    R(c, "#bd757e", hx + 1, hy + 3, 5, 1);
+    R(c, "#bd757e", hx + 2, hy + 4, 3, 1);
+    R(c, "#e8a0a8", hx + 1, hy + 1, 1, 1);
+  };
+  heart(14, 12);
+  heart(w - 21, 12);
+  // flowers at the foot
+  for (const fx of [12, 36, w - 42, w - 16]) {
+    R(c, "#67835c", fx, 78, 1, 4);
+    R(c, "#f7ebaa", fx - 1, 76, 3, 2);
+    R(c, "#bd757e", fx, 75, 1, 1);
+  }
+};
+
 function drawnProps(): Record<string, Img> {
   const sign = (read: boolean) =>
     mk(26, 32, (c) => {
@@ -125,43 +163,9 @@ function drawnProps(): Record<string, Img> {
       R(c, "#bd757e", 15, 0, 2, 7);
       R(c, "#bd757e", 13, 0, 2, 3);
     }),
-    // The big apology board at the start point (the words are drawn on top by
-    // GameWorld, so they stay sharp at any zoom).
-    sorryBoard: mk(150, 84, (c) => {
-      ell(c, SHADOW, 75, 82, 66, 2);
-      // two posts
-      R(c, WOOD_D, 20, 66, 9, 17);
-      R(c, WOOD, 22, 66, 4, 17);
-      R(c, WOOD_D, 121, 66, 9, 17);
-      R(c, WOOD, 123, 66, 4, 17);
-      // the board: dark frame, light planks, parchment
-      R(c, WOOD_D, 0, 0, 150, 70);
-      R(c, WOOD_L, 2, 2, 146, 66);
-      R(c, "#eeba77", 2, 2, 146, 2);
-      for (let x = 14; x < 148; x += 24) R(c, "#c98f58", x, 4, 1, 62);
-      R(c, WOOD_D, 5, 5, 140, 60);
-      R(c, PAPER, 7, 7, 136, 56);
-      R(c, "#e9d6a8", 7, 60, 136, 3);
-      // nails in the corners
-      for (const [nx, ny] of [[3, 3], [145, 3], [3, 65], [145, 65]]) R(c, "#545959", nx, ny, 2, 2);
-      // little hearts either side of the title
-      const heart = (hx: number, hy: number) => {
-        R(c, "#bd757e", hx + 1, hy, 2, 1);
-        R(c, "#bd757e", hx + 4, hy, 2, 1);
-        R(c, "#bd757e", hx, hy + 1, 7, 2);
-        R(c, "#bd757e", hx + 1, hy + 3, 5, 1);
-        R(c, "#bd757e", hx + 2, hy + 4, 3, 1);
-        R(c, "#e8a0a8", hx + 1, hy + 1, 1, 1);
-      };
-      heart(14, 12);
-      heart(129, 12);
-      // flowers at the foot
-      for (const fx of [12, 36, 108, 134]) {
-        R(c, "#67835c", fx, 78, 1, 4);
-        R(c, "#f7ebaa", fx - 1, 76, 3, 2);
-        R(c, "#bd757e", fx, 75, 1, 1);
-      }
-    }),
+    // The big apology board at the start point, and a second one beside it.
+    sorryBoard: mk(150, 84, boardArt(150)),
+    kindBoard: mk(124, 84, boardArt(124)),
     lamp: mk(12, 36, (c) => {
       ell(c, SHADOW, 6, 34, 4, 1);
       ell(c, "rgba(247,235,170,0.28)", 6, 6, 6, 5);

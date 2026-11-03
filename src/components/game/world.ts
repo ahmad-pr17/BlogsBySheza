@@ -154,7 +154,11 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
   place("sorryBoard", 16.125, 14, {
     blockTiles: [11, 12, 13, 14, 15, 16, 17, 18, 19].map((c) => [c, 14] as [number, number]),
   });
-  reserve(8, 9, 19, 14);
+  // and a second board of kind reminders beside it
+  place("kindBoard", 7.125, 14, {
+    blockTiles: [3, 4, 5, 6, 7, 8, 9, 10].map((c) => [c, 14] as [number, number]),
+  });
+  reserve(3, 9, 19, 14);
 
   // square: campfire with benches, jukebox, lamps and flowers
   place("campfire", 22, 10, { blockTiles: [[21, 10], [22, 10]] });

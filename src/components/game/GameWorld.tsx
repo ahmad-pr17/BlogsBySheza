@@ -81,6 +81,15 @@ const SORRY_LINES = [
   "or anything bad.",
 ];
 
+// The kind reminders on the second board.
+const KIND_LINES = [
+  "It's normal to laugh when someone trips.",
+  "It's okay to notice change in yourself.",
+  "You are not toxic.",
+  "Things take their own time and way.",
+  "Believe and trust Allah.",
+];
+
 type Scene = "out" | "home";
 type Role = "visitor" | "owner" | "super";
 
@@ -1394,7 +1403,10 @@ export function GameWorld({
 
       // (the apology board is wide, so keep objects a little longer in view)
       const vis = world.objects.filter(
-        (o) => inView(o) || (o.key === "sorryBoard" && Math.abs(o.x - (s.camX + vw / 2)) < vw / 2 + 90),
+        (o) =>
+          inView(o) ||
+          ((o.key === "sorryBoard" || o.key === "kindBoard") &&
+            Math.abs(o.x - (s.camX + vw / 2)) < vw / 2 + 90),
       );
       for (const o of vis) {
         if (!o.flat) continue;
@@ -1422,6 +1434,19 @@ export function GameWorld({
           SORRY_LINES.forEach((line, i) =>
             ctx.fillText(line, cx, top + 30 + i * 7 + (i >= 2 ? 3 : 0)),
           );
+          ctx.textAlign = "start";
+        }
+        if (o.key === "kindBoard") {
+          const cx = Math.round(o.x);
+          const top = Math.round(o.y - cv.height);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "alphabetic";
+          ctx.fillStyle = "#a1352a";
+          ctx.font = `10px ${family}`;
+          ctx.fillText("REMEMBER", cx, top + 18);
+          ctx.fillStyle = "#3a2a18";
+          ctx.font = `5.2px ${family}`;
+          KIND_LINES.forEach((line, i) => ctx.fillText(line, cx, top + 29 + i * 6.6));
           ctx.textAlign = "start";
         }
       }
@@ -1800,6 +1825,13 @@ export function GameWorld({
         <p>
           Sorry for making you feel ignored from my side. Sorry for anything I said or did that
           didn&apos;t feel right, or felt ignorant and rude, or anything bad.
+        </p>
+      </section>
+
+      <section className="sr-only" aria-label="Kind reminders at the start of the town">
+        <p>
+          It&apos;s normal to laugh when someone trips. It&apos;s okay to notice change in yourself.
+          You are not toxic. Things take their own time and way. Believe and trust Allah.
         </p>
       </section>
 
