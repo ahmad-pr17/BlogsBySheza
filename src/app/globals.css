@@ -1043,6 +1043,121 @@ body.game-lock {
   opacity: 0.55;
   cursor: default;
 }
+.g-recipes {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(14, 30, 18, 0.55);
+  font-family: var(--font-pixelify), monospace;
+}
+.g-recipes-card {
+  width: min(360px, 100%);
+  padding: 16px;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 4px solid var(--wood-dark);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 3px #f0c48c,
+    0 6px 0 rgba(0, 0, 0, 0.4);
+}
+.g-recipes-card ul {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.g-recipes-card li button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 10px;
+  font: inherit;
+  text-align: left;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-recipes-card li button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.g-recipes-card li button:not(:disabled):hover,
+.g-recipes-card li button:focus-visible {
+  outline: none;
+  background: #fff3d2;
+}
+.g-rec-icon {
+  font-size: 24px;
+}
+.g-rec-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 17px;
+}
+.g-rec-name small {
+  font-size: 12px;
+  color: #7a4a22;
+}
+.g-recipes-note {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #7a4a22;
+}
+.g-players {
+  max-height: min(320px, 60vh);
+  overflow-y: auto;
+  font-family: var(--font-pixelify), monospace;
+  color: #3a2a18;
+}
+.g-players ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.g-players li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+.g-players .g-pl-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-players li button {
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-players-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: #5c3416;
+}
+.g-players-empty,
+.g-players-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7a4a22;
+}
 .g-bar-touch .g-chat {
   position: fixed;
   left: 10px;

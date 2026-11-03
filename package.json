@@ -7,7 +7,9 @@
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "npx prisma db seed"
+    "db:seed": "npx prisma db seed",
+    "test": "tsx --test src/components/game/names.test.ts src/components/game/daynight.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -23,6 +25,7 @@
     "slugify": "^1.6.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

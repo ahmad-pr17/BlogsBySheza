@@ -53,6 +53,17 @@ const fontVariables = [
 export const metadata: Metadata = {
   title: "Sheza's Blogs",
   description: "Dev updates, design notes, and musings from Sheza.",
+  openGraph: {
+    title: "Sheza's Blogs",
+    description: "A retro pixel town where Sheza lets her thoughts out. Walk in and read.",
+    siteName: "Sheza's Blogs",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Sheza's Blogs",
+    description: "A retro pixel town where Sheza lets her thoughts out. Walk in and read.",
+  },
 };
 
 export default function RootLayout({

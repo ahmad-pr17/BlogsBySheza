@@ -10,6 +10,7 @@ export type Stop = {
   title: string;
   date: string;
   category: string;
+  isNew?: boolean; // published in the last week
 };
 
 export type Interact = {
@@ -149,9 +150,14 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
     });
   }
 
+  // the big sorry board, just left of where you arrive
+  place("sorryBoard", 16.125, 14, {
+    blockTiles: [11, 12, 13, 14, 15, 16, 17, 18, 19].map((c) => [c, 14] as [number, number]),
+  });
+  reserve(8, 9, 19, 14);
+
   // square: campfire with benches, jukebox, lamps and flowers
   place("campfire", 22, 10, { blockTiles: [[21, 10], [22, 10]] });
-  place("bench", 19.5, 10, { blockTiles: [[18, 10], [19, 10]] });
   place("bench", 25.5, 10, { blockTiles: [[25, 10], [26, 10]] });
   const boxC = 29;
   place("jukebox", boxC + 0.5, 11, { blockTiles: [[boxC, 11]], interact: "song" });
@@ -182,7 +188,7 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
     interacts.push({
       id,
       kind: "post",
-      label: s.title,
+      label: s.isNew ? `✨ ${s.title}` : s.title,
       verb: `Read “${s.title}”`,
       slug: s.slug,
       signX: (sc + 0.5) * T,

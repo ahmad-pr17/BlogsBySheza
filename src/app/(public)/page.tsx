@@ -13,6 +13,11 @@ import { REACTION_EMOJIS, type ReactionCounts } from "@/lib/reactions";
 
 export const dynamic = "force-dynamic";
 
+// Posts from the last week get a ✨ on their sign.
+function publishedThisWeek(date: Date) {
+  return Date.now() - new Date(date).getTime() < 7 * 24 * 3600 * 1000;
+}
+
 // Fallback for a post with no reactions yet (all zeros).
 const EMPTY_COUNTS = Object.fromEntries(
   REACTION_EMOJIS.map((e) => [e, 0]),
@@ -92,6 +97,7 @@ export default async function Home({
     title: p.title,
     date: formatPostDate(p.publishedAt ?? p.createdAt),
     category: p.category,
+    isNew: publishedThisWeek(p.publishedAt ?? p.createdAt),
   }));
 
   // The game is fixed full-screen, covering the header and footer.

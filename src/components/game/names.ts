@@ -10,9 +10,13 @@ const LEET: Record<string, string> = {
 const PROFANITY = [
   "fuck", "shit", "bitch", "cunt", "pussy", "slut", "whore", "nigg", "fag",
   "rape", "nazi", "hitler", "porn", "penis", "vagina", "asshole", "retard",
+  "bastard", "wank", "twat", "dickhead", "blowjob",
 ];
 // Names only: do not pose as the owner or the superadmin.
 const RESERVED = ["admin", "sheza", "owner", "moderator"];
+const collapse = (w: string) => w.replace(/(.)\1+/g, "$1");
+const BAD = [...RESERVED, ...PROFANITY].map(collapse);
+const BAD_MESSAGE = PROFANITY.map(collapse);
 
 export function cleanName(raw: string): string {
   return raw
@@ -29,7 +33,8 @@ function squash(name: string) {
     .split("")
     .map((ch) => LEET[ch] ?? ch)
     .join("")
-    .replace(/[^a-z]/g, "");
+    .replace(/[^a-z]/g, "")
+    .replace(/(.)\1+/g, "$1"); // "fuuuck" -> "fuck"
 }
 
 // null when the name is fine, otherwise a friendly reason.
@@ -38,7 +43,7 @@ export function nameProblem(clean: string): string | null {
   if (clean.length < 2) return "Names need at least 2 characters.";
   const s = squash(clean);
   if (s === "fox" || s === "thefox") return "Please choose a different name."; // the superadmin
-  if ([...RESERVED, ...PROFANITY].some((w) => s.includes(w))) return "Please choose a different name.";
+  if (BAD.some((w) => s.includes(w))) return "Please choose a different name.";
   return null;
 }
 
@@ -64,7 +69,7 @@ export function cleanMessage(raw: string): string {
 export function messageProblem(clean: string): string | null {
   if (!clean) return "Type a message first.";
   if (/https?:|www\.|\.(com|net|org|io|ly|me|xyz|gg)\b/i.test(clean)) return "Links are not allowed here.";
-  if (PROFANITY.some((w) => squash(clean).includes(w))) return "Please keep it friendly.";
+  if (BAD_MESSAGE.some((w) => squash(clean).includes(w))) return "Please keep it friendly.";
   return null;
 }
 

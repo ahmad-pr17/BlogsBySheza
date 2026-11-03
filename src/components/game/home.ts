@@ -28,7 +28,20 @@ export type HomeDrawState = {
   y: number;
 };
 
-export function buildHome(): World {
+// The Home grows cozier the more you cook: at these meal counts new things
+// appear (see UNLOCKS) and the recipe book gains dishes (see RECIPES in
+// GameWorld).
+export const UNLOCK_AT = [2, 5, 9];
+export const UNLOCK_TEXT = [
+  "a lamp on the counter and a plant by the bed",
+  "a second rug and a reading stool",
+  "a sunflower and a doormat rug",
+];
+export function stageFor(cooked: number) {
+  return UNLOCK_AT.filter((n) => cooked >= n).length;
+}
+
+export function buildHome(stage = 0): World {
   const kind = new Uint8Array(HC * HR);
   const blocked = new Uint8Array(HC * HR);
   const objects: Obj[] = [];
@@ -88,6 +101,21 @@ export function buildHome(): World {
   put("f_sunflower", 27, 214, { block: [[1, 13]] });
   put("f_plantA", 294, 214, { block: [[18, 13]] });
   put("lamp", 291, 150, { block: [[18, 9]] });
+
+  // things that appear as you cook more meals
+  if (stage >= 1) {
+    put("f_lampB", 228, 80.2, { lift: 18 });
+    put("f_plantA", 52, 114);
+  }
+  if (stage >= 2) {
+    put("f_rugG", 160, 152, { flat: true });
+    put("f_stool", 150, 156, { block: [[9, 9]] });
+    put("f_plantB", 150, 156.2, { lift: 9 });
+  }
+  if (stage >= 3) {
+    put("f_sunflower", 294, 102, { block: [[18, 6]] });
+    put("f_rugT", 160, 208, { flat: true });
+  }
 
   objects.sort((a, b) => a.y - b.y);
 

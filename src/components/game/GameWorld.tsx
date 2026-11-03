@@ -12,40 +12,41 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PostModal } from "@/components/game/PostModal";
+import { DAY_NIGHT_ENABLED, darknessAt, labelAt, skipSeconds } from "@/components/game/daynight";
 import { mulberry32 } from "@/components/game/rng";
+import { sound } from "@/components/game/sound";
 import { loadArt, type Art } from "@/components/game/art";
 import { buildGround, type Ground } from "@/components/game/ground";
 import {
   buildHome,
   buildHomeBg,
   drawHomeScene,
+  stageFor,
+  UNLOCK_AT,
+  UNLOCK_TEXT,
   type HomeDrawState,
 } from "@/components/game/home";
 import {
   DEFAULT_CHOICE,
-  FARMER_TINTS,
   FOX_CHOICE,
   HEAD_TOP,
   OWNER_CHOICE,
   isKind,
   labelOf,
-  VISITOR_CHARS,
   type CharKind,
   type Choice,
 } from "@/components/game/characters";
-import {
-  cleanMessage,
-  cleanName,
-  MAX_MESSAGE,
-  MAX_NAME,
-  messageProblem,
-  nameProblem,
-} from "@/components/game/names";
+import { cleanMessage, messageProblem } from "@/components/game/names";
+import { GateScreen } from "@/components/game/GateScreen";
+import { HelpPanel } from "@/components/game/HelpPanel";
+import { ACTIONS, HudBar, QUICK } from "@/components/game/HudBar";
+import { RecipeBook, RECIPES } from "@/components/game/RecipeBook";
 import {
   ACTION_SECONDS,
   connectMultiplayer,
   randomName,
   type Multiplayer,
+  type PlayerInfo,
 } from "@/components/game/multiplayer";
 import {
   buildWorld,
@@ -69,44 +70,20 @@ const PAGE_URL: Record<string, string> = {
   [ADMIN]: "/?page=admin",
 };
 const BIG = new Set(["about", "admin", "home"]); // house-sized interactables
-const DISHES: [string, string][] = [
-  ["dishStew", "mushroom stew"],
-  ["dishBread", "honey bread"],
-  ["dishPie", "berry pie"],
-  ["dishSoup", "garden soup"],
+const HOME_KEY = "trail-home";
+
+// The apology on the big board at the start point.
+const SORRY_LINES = [
+  "Sorry for making you feel ignored",
+  "from my side.",
+  "Sorry for anything I said or did that didn't",
+  "feel right, or felt ignorant and rude,",
+  "or anything bad.",
 ];
 
 type Scene = "out" | "home";
 type Role = "visitor" | "owner" | "super";
 
-// Quick emotes (keys 1-4), more in the panel, and body actions (keys 5-7).
-const QUICK = ["👋", "❤", "♪", "💤"];
-const MORE_EMOJI = [
-  ...QUICK,
-  "😂", "😮", "😢", "😡", "😍", "😎", "👍", "👎", "🎉", "✨",
-  "❓", "❗", "🔥", "🌸", "🍪", "☕", "🌙", "⭐", "🎵", "💭",
-];
-const ACTIONS: { k: string; icon: string; label: string }[] = [
-  { k: "!dance", icon: "💃", label: "Dance" },
-  { k: "!jump", icon: "🦘", label: "Jump" },
-  { k: "!spin", icon: "🔄", label: "Spin" },
-];
-const CHAR_KEY = "trail-character";
-const OWNER_CHAR_KEY = "trail-owner-character";
-
-// The picture of a character on the entry screen (front-facing, standing).
-function CharPreview({ art, kind, tint }: { art: Art | null; kind: CharKind; tint: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = ref.current?.getContext("2d");
-    if (!c || !art) return;
-    c.imageSmoothingEnabled = false;
-    c.clearRect(0, 0, 16, 32);
-    const sheet = art.chars[kind]?.[tint] ?? art.chars[kind]?.[0];
-    if (sheet) c.drawImage(sheet, 4 * 16, 32, 16, 32, 0, 0, 16, 32);
-  }, [art, kind, tint]);
-  return <canvas ref={ref} width={16} height={32} className="g-char-prev" aria-hidden="true" />;
-}
 
 // Minimap colours (Sprout Lands palette).
 const MINI = {
@@ -139,7 +116,9 @@ export function GameWorld({
   const owner = role === "owner";
   const canAdmin = role !== "visitor";
   const world = useMemo(() => buildWorld(stops, canAdmin), [stops, canAdmin]);
-  const home = useMemo(() => buildHome(), []);
+  const [cooked, setCooked] = useState(0); // meals cooked in this browser
+  const homeStage = stageFor(cooked);
+  const home = useMemo(() => buildHome(homeStage), [homeStage]);
   const scenes = useMemo(() => ({ out: world, home }), [world, home]);
 
   const initialInteract = initialSlug
@@ -151,21 +130,18 @@ export function GameWorld({
   // never from an old admin cookie.
   const gateInitial = !(initialSlug || initialPage);
   const [gate, setGate] = useState(gateInitial);
-  const [gateMode, setGateMode] = useState<"choose" | "pick" | "owner" | "super" | "ownerPick">("choose");
-  const [choice, setChoice] = useState<Choice>(DEFAULT_CHOICE);
-  const [ownerChoice, setOwnerChoice] = useState<Choice>(OWNER_CHOICE);
-  const [nameInput, setNameInput] = useState("");
-  const [nameErr, setNameErr] = useState<string | null>(null);
-  const [pw, setPw] = useState("");
-  const [gateErr, setGateErr] = useState<string | null>(null);
-  const [gateBusy, setGateBusy] = useState(false);
   const [relogin, setRelogin] = useState(false); // opened later from the game, not at the start
   const [online, setOnline] = useState(1);
   const [mpOn, setMpOn] = useState(false);
   const [flyUi, setFlyUi] = useState(false);
   const [boostUi, setBoostUi] = useState(false);
   const [emoteOpen, setEmoteOpen] = useState(false);
+  const [timeLabel, setTimeLabel] = useState("☀️ Day");
+  const soundMuted = useSyncExternalStore(sound.subscribe, sound.isMuted, () => false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [recipesOpen, setRecipesOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [chatText, setChatText] = useState("");
   const chatRef = useRef<HTMLInputElement>(null);
   const mpRef = useRef<Multiplayer | null>(null);
@@ -219,9 +195,15 @@ export function GameWorld({
     fade: null as null | { t: number; dur: number; phase: "out" | "in"; cb: () => void },
     sleep: null as null | { t: number; flipped: boolean },
     cook: -1, // 0..1 while cooking
+    cookSecs: 3, // how long the current dish takes
+    cookRecipe: 0,
+    cooked: 0, // mirror of the cooked state, for the frame loop
     dish: null as string | null,
     dishName: "",
     night: false,
+    dayShift: 0, // seconds: sleeping skips your own view of the clock ahead
+    timeLabel: "☀️ Day",
+    reading: initialInteract?.slug ?? "",
     heartT: -99,
     // multiplayer / superadmin
     admin: false,
@@ -233,6 +215,7 @@ export function GameWorld({
     myAct: { k: "", at: -99999 },
     mySay: { text: "", at: -99999 },
     lastSay: -99999,
+    silencedUntil: 0, // a moderator muted your chat until this time
     choice: DEFAULT_CHOICE as Choice,
     ownerChoice: OWNER_CHOICE as Choice,
     chosenName: "",
@@ -250,50 +233,15 @@ export function GameWorld({
     [],
   );
 
-  // Remember the last character picked on this device.
-  const restoreChoice = useCallback(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(CHAR_KEY) ?? "null");
-      if (saved && isKind(saved.kind) && saved.kind !== "fox") {
-        setChoice({
-          kind: saved.kind,
-          tint: Math.abs(Number(saved.tint) || 0) % FARMER_TINTS,
-        });
-        if (typeof saved.name === "string") setNameInput(cleanName(saved.name));
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const startAsVisitor = () => {
-    const name = cleanName(nameInput);
-    const problem = nameProblem(name);
-    if (problem) {
-      setNameErr(problem);
-      return;
-    }
-    try {
-      localStorage.setItem(CHAR_KEY, JSON.stringify({ ...choice, name }));
-    } catch {
-      /* ignore */
-    }
-    g.current.choice = choice;
-    g.current.chosenName = name;
-    dismissGate();
-  };
-
-  const startAsOwner = () => {
-    try {
-      localStorage.setItem(OWNER_CHAR_KEY, JSON.stringify(ownerChoice));
-    } catch {
-      /* ignore */
-    }
-    g.current.ownerChoice = ownerChoice;
-    dismissGate();
-  };
-
   const dismissGate = useCallback(() => {
+    sound.unlock(); // a click got us here, so the browser lets sound start
+    try {
+      const n = Number(JSON.parse(localStorage.getItem(HOME_KEY) ?? "{}").cooked) || 0;
+      g.current.cooked = n;
+      setCooked(n);
+    } catch {
+      /* ignore */
+    }
     setGate(false);
     setRelogin(false);
     g.current.open = false;
@@ -302,9 +250,6 @@ export function GameWorld({
   // A visitor who is already playing can still sign in as Sheza or the superadmin.
   const openLogin = useCallback(() => {
     setRelogin(true);
-    setGateMode("choose");
-    setGateErr(null);
-    setPw("");
     setEmoteOpen(false);
     setChatOpen(false);
     g.current.target = null;
@@ -312,6 +257,28 @@ export function GameWorld({
     g.current.open = true;
     setGate(true);
   }, []);
+
+  // What the entry screen reports back.
+  const handleVisitor = (c: Choice, name: string) => {
+    g.current.choice = c;
+    g.current.chosenName = name;
+    dismissGate();
+  };
+  const handleLoggedIn = (r: "owner" | "super") => {
+    setFlyUi(false);
+    setBoostUi(false);
+    setRole(r);
+    if (r === "super") dismissGate(); // Sheza still picks a character first
+  };
+  const handleOwnerStart = (c: Choice) => {
+    g.current.ownerChoice = c;
+    dismissGate();
+  };
+  const cancelLogin = () => {
+    setGate(false);
+    setRelogin(false);
+    g.current.open = false;
+  };
 
   useEffect(() => {
     g.current.admin = admin;
@@ -342,6 +309,15 @@ export function GameWorld({
         setOnline(n);
         setMpOn(true);
       },
+      onEvent: (kind) => sound.play(kind === "chat" ? "chat" : "pop"),
+      onSilenced: (ms) => {
+        g.current.silencedUntil = performance.now() + ms;
+        showToast(
+          ms > 0
+            ? `A moderator muted your chat for ${Math.ceil(ms / 60000)} min.`
+            : "Your chat is unmuted again.",
+        );
+      },
     });
     mpRef.current = mp;
     return () => {
@@ -349,7 +325,7 @@ export function GameWorld({
       mpRef.current = null;
       setMpOn(false);
     };
-  }, [gate, admin, owner]);
+  }, [gate, admin, owner, showToast]);
 
   const unstick = useCallback(() => {
     const s = g.current;
@@ -394,12 +370,86 @@ export function GameWorld({
       g.current.myEmote = { k, at: performance.now() };
     }
     mpRef.current?.emote(k);
+    sound.play("pop");
   }, []);
+
+  // The players list: refresh while it is open.
+  useEffect(() => {
+    if (!playersOpen) return;
+    const id = setInterval(() => setPlayers(mpRef.current?.players() ?? []), 1000);
+    return () => clearInterval(id);
+  }, [playersOpen]);
+
+  const togglePlayers = () => {
+    setPlayers(mpRef.current?.players() ?? []);
+    setEmoteOpen(false);
+    setChatOpen(false);
+    setPlayersOpen((o) => !o);
+  };
+
+  const toggleMute = (p: PlayerInfo) => {
+    mpRef.current?.mute(p.id, !p.muted);
+    setPlayers(mpRef.current?.players() ?? []);
+  };
+
+  // Owner / superadmin: silence a visitor's chat and emotes for 10 minutes.
+  const silence = async (p: PlayerInfo, minutes: number) => {
+    try {
+      const res = await fetch("/api/realtime/moderate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: p.id, minutes }),
+      });
+      showToast(
+        res.ok
+          ? minutes > 0
+            ? `${p.name} is silenced for ${minutes} min.`
+            : `${p.name} can chat again.`
+          : "Could not do that. Are you still logged in?",
+      );
+    } catch {
+      showToast("Could not reach the server.");
+    }
+  };
+
+  // Choose a recipe from the book and start cooking.
+  const startCooking = (i: number) => {
+    const s = g.current;
+    const r = RECIPES[i];
+    if (!r || s.cooked < r.need) return;
+    s.cookRecipe = i;
+    s.cookSecs = r.secs;
+    s.cook = 0;
+    s.dir = 0;
+    s.open = false;
+    s.busy = true;
+    setRecipesOpen(false);
+    sound.play("sizzle");
+  };
+  const closeRecipes = () => {
+    g.current.open = false;
+    setRecipesOpen(false);
+  };
+  useEffect(() => {
+    if (!recipesOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        g.current.open = false;
+        setRecipesOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [recipesOpen]);
 
   // A typed message: shown above your head and sent to everyone online.
   const sendChat = (e: React.FormEvent) => {
     e.preventDefault();
     const s = g.current;
+    if (performance.now() < s.silencedUntil) {
+      showToast("Your chat is muted for now.");
+      return;
+    }
     const text = cleanMessage(chatText);
     const problem = messageProblem(text);
     if (problem) {
@@ -413,6 +463,7 @@ export function GameWorld({
     s.lastSay = performance.now();
     s.mySay = { text, at: performance.now() };
     mpRef.current?.say(text);
+    sound.play("chat");
     setChatText("");
     if (touch) setChatOpen(false);
   };
@@ -421,57 +472,6 @@ export function GameWorld({
   useEffect(() => {
     if (chatOpen) chatRef.current?.focus();
   }, [chatOpen]);
-
-  const adminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGateBusy(true);
-    setGateErr(null);
-    try {
-      const res = await fetch(gateMode === "super" ? "/api/auth/superadmin" : "/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
-      });
-      if (!res.ok) {
-        setGateErr(
-          res.status === 401
-            ? "That password is not right."
-            : res.status === 429
-              ? "Too many tries. Please wait a few minutes."
-              : res.status === 503
-                ? "This login is not set up yet."
-                : "Could not log in. Try again.",
-        );
-      } else {
-        setPw("");
-        setFlyUi(false);
-        setBoostUi(false);
-        if (gateMode === "super") {
-          setRole("super");
-          dismissGate();
-        } else {
-          // Sheza picks how she looks before walking in
-          try {
-            const saved = JSON.parse(localStorage.getItem(OWNER_CHAR_KEY) ?? "null");
-            if (saved && (saved.kind === "farmer" || saved.kind === "bear")) {
-              setOwnerChoice({
-                kind: saved.kind,
-                tint: saved.kind === "farmer" ? Math.abs(Number(saved.tint) || 0) % 3 : 0,
-              });
-            }
-          } catch {
-            /* ignore */
-          }
-          setRole("owner");
-          setGateMode("ownerPick");
-        }
-      }
-    } catch {
-      setGateErr("Could not reach the server.");
-    } finally {
-      setGateBusy(false);
-    }
-  };
 
   const adminLogout = async () => {
     try {
@@ -513,16 +513,21 @@ export function GameWorld({
     );
   }, [world]);
 
-  const openModal = useCallback((key: string, url: string) => {
+  const openModal = useCallback(
+    (key: string, url: string) => {
     g.current.open = true;
+    g.current.reading = stops.some((st) => st.slug === key) ? key : "";
     g.current.target = null;
     g.current.keys.clear();
     setOpenKey(key);
     window.history.replaceState(null, "", url);
-  }, []);
+    },
+    [stops],
+  );
 
   const closeModal = useCallback(() => {
     g.current.open = false;
+    g.current.reading = "";
     setOpenKey(null);
     window.history.replaceState(null, "", "/");
   }, []);
@@ -538,6 +543,7 @@ export function GameWorld({
   const switchScene = useCallback(
     (to: Scene) => {
       const s = g.current;
+      sound.play("door");
       s.scene = to;
       s.near = null;
       setNearId(null);
@@ -570,17 +576,17 @@ export function GameWorld({
           s.target = null;
           s.keys.clear();
           s.sleep = { t: 0, flipped: false };
+          sound.play("chime");
           break;
         case "cook":
           if (s.dish) {
             showToast(`The table already has ${s.dishName}. Eat it first!`);
             break;
           }
-          s.busy = true;
           s.target = null;
           s.keys.clear();
-          s.dir = 0;
-          s.cook = 0;
+          s.open = true; // the recipe book is open: stand still
+          setRecipesOpen(true);
           break;
         case "eat":
           if (!s.dish) {
@@ -648,6 +654,7 @@ export function GameWorld({
     fly: toggleFly,
     emote: sendEmote,
     chat: openChat,
+    cooked: setCooked as (n: number) => void,
   });
   useEffect(() => {
     act.current = {
@@ -657,6 +664,7 @@ export function GameWorld({
       fly: toggleFly,
       emote: sendEmote,
       chat: openChat,
+      cooked: setCooked as (n: number) => void,
     };
   }, [activate, goTo, showToast, toggleFly, sendEmote, openChat]);
 
@@ -707,6 +715,8 @@ export function GameWorld({
       getComputedStyle(document.documentElement)
         .getPropertyValue("--font-pixelify")
         .trim() || "monospace";
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const resize = () => {
       const cw = window.innerWidth;
@@ -842,6 +852,8 @@ export function GameWorld({
     };
 
     let raf = 0;
+    let stepAcc = 0; // time since the last footstep sound
+    let birdIn = 5; // seconds until the next bird chirps
     let last = performance.now();
 
     const frame = (now: number) => {
@@ -850,6 +862,15 @@ export function GameWorld({
       const t = now / 1000;
 
       const W = cur();
+
+      // ---- time of day (shared clock; calm mode stays in daylight) ----
+      const dark = reduceMotion ? 0 : darknessAt(s.dayShift);
+      s.night = dark > 0.5;
+      const timeText = reduceMotion ? "☀️ Day" : labelAt(s.dayShift);
+      if (timeText !== s.timeLabel) {
+        s.timeLabel = timeText;
+        setTimeLabel(timeText);
+      }
 
       // ---- timelines: scene fades, sleeping, cooking ----
       let fadeA = 0;
@@ -878,7 +899,7 @@ export function GameWorld({
           sleepText = true;
           if (!k.flipped && k.t > 1.3) {
             k.flipped = true;
-            s.night = !s.night;
+            s.dayShift += skipSeconds(s.dayShift);
           }
         } else if (k.t < 3.6) sleepA = 1 - (k.t - 2.7) / 0.9;
         else {
@@ -887,16 +908,37 @@ export function GameWorld({
         }
       }
       if (s.cook >= 0) {
-        s.cook += dt / 3.2;
+        s.cook += dt / s.cookSecs;
         if (s.cook >= 1) {
           s.cook = -1;
-          const [key, name] = DISHES[Math.floor(Math.random() * DISHES.length)];
-          s.dish = key;
-          s.dishName = name;
-          act.current.toast(`You cooked ${name}! It is on the table.`);
+          const r = RECIPES[s.cookRecipe] ?? RECIPES[0];
+          s.dish = r.key;
+          s.dishName = r.name;
+          s.cooked += 1;
+          const before = stageFor(s.cooked - 1);
+          const after = stageFor(s.cooked);
+          try {
+            localStorage.setItem(HOME_KEY, JSON.stringify({ cooked: s.cooked }));
+          } catch {
+            /* ignore */
+          }
+          act.current.cooked(s.cooked);
+          act.current.toast(
+            after > before
+              ? `You cooked ${r.name}! Your home got cozier: ${UNLOCK_TEXT[after - 1]}.`
+              : `You cooked ${r.name}! It is on the table.`,
+          );
+          sound.play("chime");
         }
       }
       s.busy = !!s.fade || !!s.sleep || s.cook >= 0;
+
+      // a bird now and then, outdoors only
+      birdIn -= dt;
+      if (birdIn <= 0) {
+        birdIn = 6 + Math.random() * 9;
+        if (s.scene === "out" && !s.open) sound.play("bird");
+      }
 
       // ---- update ----
       let vx = 0;
@@ -965,7 +1007,14 @@ export function GameWorld({
         if (s.moving) {
           s.walkT += dt;
           s.myAct.k = "";
-        }
+          if (!s.fly) {
+            stepAcc += dt;
+            if (stepAcc > 0.32) {
+              stepAcc = 0;
+              sound.play(s.scene === "home" ? "stepWood" : "step");
+            }
+          }
+        } else stepAcc = 0;
 
         let best: string | null = null;
         let bestD = NEAR;
@@ -996,6 +1045,7 @@ export function GameWorld({
       if (mp) {
         mp.update(dt);
         mp.send({
+          read: s.reading,
           x: s.x,
           y: s.y,
           dir: s.dir,
@@ -1342,7 +1392,10 @@ export function GameWorld({
         o.y > s.camY - 8 &&
         o.y < s.camY + vh + 72;
 
-      const vis = world.objects.filter(inView);
+      // (the apology board is wide, so keep objects a little longer in view)
+      const vis = world.objects.filter(
+        (o) => inView(o) || (o.key === "sorryBoard" && Math.abs(o.x - (s.camX + vw / 2)) < vw / 2 + 90),
+      );
       for (const o of vis) {
         if (!o.flat) continue;
         const cv = spriteFor(o.key, o.interact);
@@ -1355,14 +1408,30 @@ export function GameWorld({
         while (ai < actors.length && o.y > actors[ai].y) actors[ai++].draw();
         const cv = spriteFor(o.key, o.interact);
         ctx.drawImage(cv, Math.round(o.x - cv.width / 2), Math.round(o.y - cv.height));
+        if (o.key === "sorryBoard") {
+          // the words on the board (drawn as text so they stay sharp)
+          const cx = Math.round(o.x);
+          const top = Math.round(o.y - cv.height);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "alphabetic";
+          ctx.fillStyle = "#a1352a";
+          ctx.font = `14px ${family}`;
+          ctx.fillText("SORRY", cx, top + 20);
+          ctx.fillStyle = "#3a2a18";
+          ctx.font = `5.6px ${family}`;
+          SORRY_LINES.forEach((line, i) =>
+            ctx.fillText(line, cx, top + 30 + i * 7 + (i >= 2 ? 3 : 0)),
+          );
+          ctx.textAlign = "start";
+        }
       }
       while (ai < actors.length) actors[ai++].draw();
 
       // fireflies over the grass (only the ones on screen)
-      for (const f of flies) {
+      for (const f of reduceMotion ? [] : flies) {
         if (f.x < s.camX - 12 || f.x > s.camX + vw + 12 || f.y < s.camY - 12 || f.y > s.camY + vh + 12) continue;
         const a = Math.max(0, Math.sin(t * 1.7 + f.p * 3));
-        const glow = 0.25 + 0.75 * a * a;
+        const glow = Math.min(1, (0.25 + 0.75 * a * a) * (0.6 + dark * 1.1));
         const fx = Math.round(f.x + Math.sin(t * 0.6 + f.p) * 9);
         const fy = Math.round(f.y + Math.cos(t * 0.8 + f.p * 1.3) * 6 - 6);
         ctx.fillStyle = `rgba(255,170,40,${0.2 * glow})`;
@@ -1381,6 +1450,29 @@ export function GameWorld({
         ctx.drawImage(art.sprites.exclaim as HTMLCanvasElement, Math.round(it.signX - 4), Math.round(it.signY - 48 + bob));
       }
 
+      // dusk and night: dim the world, light the lamps and the campfire
+      if (dark > 0.02) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = `rgba(14,20,66,${0.5 * dark})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = `rgba(255,140,60,${0.13 * Math.sin(Math.PI * Math.min(1, dark))})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = "lighter";
+        for (const o of vis) {
+          const isLamp = o.key === "lamp";
+          if (!isLamp && o.key !== "campfire") continue;
+          const gx = (o.x - s.camX) * S;
+          const gy = (o.y - (isLamp ? 30 : 8) - s.camY) * S;
+          const gr = (isLamp ? 56 : 78) * S;
+          const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+          grad.addColorStop(0, `rgba(255,205,120,${0.5 * dark})`);
+          grad.addColorStop(1, "rgba(255,205,120,0)");
+          ctx.fillStyle = grad;
+          ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
+
       // ---- screen-space labels ----
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       for (const it of world.interacts) {
@@ -1388,7 +1480,14 @@ export function GameWorld({
         const lift = it.kind === "post" ? 36 : BIG.has(it.id) ? 70 : 34;
         const sx = (it.signX - s.camX) * S;
         const sy = (it.signY - lift - s.camY) * S;
-        drawTag(it.label, sx, sy, it.id === s.near);
+        let text = it.label;
+        if (it.kind === "post" && it.slug) {
+          // how many people are reading this post right now
+          let n = s.reading === it.slug ? 1 : 0;
+          for (const r of mpRef.current?.remotes.values() ?? []) if (r.reading === it.slug) n++;
+          if (n > 0) text = `📖${n} ${text}`;
+        }
+        drawTag(text, sx, sy, it.id === s.near);
       }
 
       drawPeople();
@@ -1418,6 +1517,8 @@ export function GameWorld({
         if (k.startsWith("arrow")) e.preventDefault();
       } else if (k === "f" && g.current.admin) {
         act.current.fly();
+      } else if (k === "m") {
+        sound.setMuted(!sound.isMuted());
       } else if (k === "t") {
         e.preventDefault();
         act.current.chat();
@@ -1500,7 +1601,12 @@ export function GameWorld({
             : (stops.find((s) => s.slug === openKey)?.title ?? "Post");
 
   return (
-    <div className="g-root">
+    <div
+      className="g-root"
+      onClickCapture={(e) => {
+        if ((e.target as HTMLElement).closest("button")) sound.play("click");
+      }}
+    >
       <canvas
         ref={canvasRef}
         className="g-canvas"
@@ -1531,6 +1637,7 @@ export function GameWorld({
           📜 {readCount} / {stops.length} read
         </span>
         {mpOn && <span>👥 {online === 1 ? "just you" : `${online} online`}</span>}
+        {DAY_NIGHT_ENABLED && <span>{timeLabel}</span>}
         {admin && <span>👑 Fox (superadmin)</span>}
         {owner && <span>🌸 Sheza (owner)</span>}
       </div>
@@ -1596,384 +1703,69 @@ export function GameWorld({
       />
 
       {!gate && (
-        <div className={`g-bar${touch ? " g-bar-touch" : ""}`}>
-          <button
-            type="button"
-            className={`g-emote g-more${chatOpen ? " on" : ""}`}
-            onClick={() => setChatOpen((o) => !o)}
-            aria-expanded={chatOpen}
-            aria-label="Chat"
-            title="Chat (T)"
-          >
-            💬
-          </button>
-          <button
-            type="button"
-            className={`g-emote g-more${emoteOpen ? " on" : ""}`}
-            onClick={() => setEmoteOpen((o) => !o)}
-            aria-expanded={emoteOpen}
-            aria-label="More emotes and actions"
-            title="More emotes and actions"
-          >
-            {emoteOpen ? "✕" : "😊"}
-          </button>
-          {chatOpen && (
-            <form className="g-chat" onSubmit={sendChat}>
-              <input
-                ref={chatRef}
-                type="text"
-                value={chatText}
-                maxLength={MAX_MESSAGE}
-                onChange={(e) => setChatText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setChatOpen(false);
-                    e.currentTarget.blur();
-                  }
-                }}
-                placeholder="Say something nice…"
-                aria-label="Chat message"
-                autoComplete="off"
-                enterKeyHint="send"
-              />
-              <button type="submit" className="g-chat-send" disabled={!chatText.trim()}>
-                Send
-              </button>
-            </form>
-          )}
-          {emoteOpen && (
-            <div className="g-emote-panel" role="group" aria-label="More emotes and actions">
-              <div className="g-emote-grid">
-                {MORE_EMOJI.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    className="g-emote"
-                    onClick={() => {
-                      sendEmote(k);
-                      setEmoteOpen(false);
-                    }}
-                    aria-label={`Emote ${k}`}
-                  >
-                    {k}
-                  </button>
-                ))}
-              </div>
-              <div className="g-action-row">
-                {ACTIONS.map((a, i) => (
-                  <button
-                    key={a.k}
-                    type="button"
-                    className="g-action"
-                    onClick={() => {
-                      sendEmote(a.k);
-                      setEmoteOpen(false);
-                    }}
-                    title={`${a.label} (${i + 5})`}
-                  >
-                    {a.icon} {a.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {admin && (
-            <>
-              <button
-                type="button"
-                className={`g-emote g-super${flyUi ? " on" : ""}`}
-                onClick={toggleFly}
-                aria-pressed={flyUi}
-                title="Fly (F)"
-              >
-                🕊️
-              </button>
-              <button
-                type="button"
-                className={`g-emote g-super${boostUi ? " on" : ""}`}
-                onClick={toggleBoost}
-                aria-pressed={boostUi}
-                title="Speed boost (hold Shift)"
-              >
-                ⚡
-              </button>
-            </>
-          )}
-          {!canAdmin && (
-            <button
-              type="button"
-              className="g-emote"
-              onClick={openLogin}
-              title="Log in as Sheza or superadmin"
-              aria-label="Log in as Sheza or superadmin"
-            >
-              🔑
-            </button>
-          )}
-          {canAdmin && (
-            <button
-              type="button"
-              className="g-emote g-super"
-              onClick={adminLogout}
-              title="Log out"
-              aria-label="Log out"
-            >
-              🚪
-            </button>
-          )}
-        </div>
+        <HudBar
+          touch={touch}
+          admin={admin}
+          canAdmin={canAdmin}
+          chat={{
+            open: chatOpen,
+            text: chatText,
+            onToggle: () => setChatOpen((o) => !o),
+            onText: setChatText,
+            onClose: () => setChatOpen(false),
+            onSubmit: sendChat,
+          }}
+          chatInputRef={chatRef}
+          sound={{ muted: soundMuted, onToggle: () => sound.setMuted(!soundMuted) }}
+          playersPanel={{
+            open: playersOpen,
+            players,
+            onToggle: togglePlayers,
+            onMute: toggleMute,
+            onSilence: silence,
+          }}
+          emotes={{
+            open: emoteOpen,
+            onToggle: () => setEmoteOpen((o) => !o),
+            onClose: () => setEmoteOpen(false),
+            onSend: sendEmote,
+          }}
+          flyUi={flyUi}
+          boostUi={boostUi}
+          onFly={toggleFly}
+          onBoost={toggleBoost}
+          onLogin={openLogin}
+          onLogout={adminLogout}
+        />
+      )}
+
+      {recipesOpen && (
+        <RecipeBook
+          cooked={cooked}
+          nextUnlock={UNLOCK_AT.find((n) => n > cooked)}
+          onChoose={startCooking}
+          onClose={closeRecipes}
+        />
       )}
 
       {gate && (
-        <div className="g-gate" role="dialog" aria-modal="true" aria-label="Welcome">
-          <div className="g-gate-card">
-            <p className="g-gate-kicker">the writings of</p>
-            <h1 className="g-gate-title">Sheza&apos;s Town</h1>
-            <p className="g-gate-sub">A little retro space where thoughts walk around. Come on in.</p>
-            {gateMode === "ownerPick" ? (
-              <form
-                className="g-pick"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  startAsOwner();
-                }}
-              >
-                <p className="g-pick-title">Welcome, Sheza! Choose your character</p>
-                <div className="g-pick-grid g-pick-two" role="radiogroup" aria-label="Character">
-                  {(["farmer", "bear"] as const).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      role="radio"
-                      aria-checked={ownerChoice.kind === k}
-                      className={`g-pick-card${ownerChoice.kind === k ? " on" : ""}`}
-                      onClick={() =>
-                        setOwnerChoice({ kind: k, tint: k === "farmer" ? ownerChoice.tint : 0 })
-                      }
-                    >
-                      <CharPreview
-                        art={assets?.art ?? null}
-                        kind={k}
-                        tint={k === "farmer" ? ownerChoice.tint : 0}
-                      />
-                      <span>{k === "farmer" ? "Farmer" : "Bear"}</span>
-                    </button>
-                  ))}
-                </div>
-                {ownerChoice.kind === "farmer" && (
-                  <div className="g-pick-tints" role="radiogroup" aria-label="Shirt colour">
-                    {[2, 0, 1].map((i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        role="radio"
-                        aria-checked={ownerChoice.tint === i}
-                        aria-label={["Yellow", "Sky blue", "Pink"][i] + " shirt"}
-                        className={`g-tint t${i}${ownerChoice.tint === i ? " on" : ""}`}
-                        onClick={() => setOwnerChoice({ kind: "farmer", tint: i })}
-                      />
-                    ))}
-                  </div>
-                )}
-                <div className="g-gate-btns">
-                  <button type="submit" className="g-gate-btn g-gate-primary" disabled={!assets}>
-                    {assets ? "▶ Let's go" : "Loading…"}
-                  </button>
-                </div>
-              </form>
-            ) : gateMode === "pick" ? (
-              <form
-                className="g-pick"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  startAsVisitor();
-                }}
-              >
-                <p className="g-pick-title">Choose your character</p>
-                <div className="g-pick-grid" role="radiogroup" aria-label="Character">
-                  {VISITOR_CHARS.map((c) => (
-                    <button
-                      key={c.kind}
-                      type="button"
-                      role="radio"
-                      aria-checked={choice.kind === c.kind}
-                      className={`g-pick-card${choice.kind === c.kind ? " on" : ""}`}
-                      onClick={() =>
-                        setChoice({ kind: c.kind, tint: c.kind === "farmer" ? choice.tint : 0 })
-                      }
-                    >
-                      <CharPreview
-                        art={assets?.art ?? null}
-                        kind={c.kind}
-                        tint={c.kind === "farmer" ? choice.tint : 0}
-                      />
-                      <span>{c.label}</span>
-                    </button>
-                  ))}
-                </div>
-                {choice.kind === "farmer" && (
-                  <div className="g-pick-tints" role="radiogroup" aria-label="Shirt colour">
-                    {Array.from({ length: FARMER_TINTS }, (_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        role="radio"
-                        aria-checked={choice.tint === i}
-                        aria-label={`Shirt colour ${i + 1}`}
-                        className={`g-tint t${i}${choice.tint === i ? " on" : ""}`}
-                        onClick={() => setChoice({ kind: "farmer", tint: i })}
-                      />
-                    ))}
-                  </div>
-                )}
-                <label className="g-name-label" htmlFor="g-name">
-                  Your name <span>(optional)</span>
-                </label>
-                <input
-                  id="g-name"
-                  className="g-name"
-                  type="text"
-                  value={nameInput}
-                  maxLength={MAX_NAME}
-                  placeholder="Pick a name, or get a random one"
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(e) => {
-                    setNameInput(e.target.value);
-                    setNameErr(null);
-                  }}
-                />
-                {nameErr && <p className="g-gate-err">{nameErr}</p>}
-                <div className="g-gate-btns">
-                  <button
-                    type="submit"
-                    className="g-gate-btn g-gate-primary"
-                    disabled={!assets}
-                  >
-                    {assets ? "▶ Let's go" : "Loading…"}
-                  </button>
-                  <button type="button" className="g-gate-btn" onClick={() => setGateMode("choose")}>
-                    Back
-                  </button>
-                </div>
-              </form>
-            ) : gateMode === "choose" ? (
-              <div className="g-gate-btns">
-                {!relogin && (
-                  <button
-                    type="button"
-                    className="g-gate-btn g-gate-primary"
-                    onClick={() => {
-                      restoreChoice();
-                      setGateMode("pick");
-                    }}
-                  >
-                    🌱 Enter as Visitor
-                  </button>
-                )}
-                <button type="button" className="g-gate-btn" onClick={() => setGateMode("owner")}>
-                  🌸 Owner (Sheza)
-                </button>
-                <button type="button" className="g-gate-btn" onClick={() => setGateMode("super")}>
-                  👑 Superadmin
-                </button>
-                {relogin && (
-                  <button
-                    type="button"
-                    className="g-gate-btn"
-                    onClick={() => {
-                      setGate(false);
-                      setRelogin(false);
-                      g.current.open = false;
-                    }}
-                  >
-                    ← Keep playing as a visitor
-                  </button>
-                )}
-              </div>
-            ) : (
-              <form className="g-gate-form" onSubmit={adminLogin}>
-                <label htmlFor="g-pw">
-                  {gateMode === "super" ? "Superadmin password" : "Owner password (Sheza)"}
-                </label>
-                <input
-                  id="g-pw"
-                  type="password"
-                  value={pw}
-                  onChange={(e) => setPw(e.target.value)}
-                  autoComplete="current-password"
-                  autoFocus
-                />
-                {gateErr && <p className="g-gate-err">{gateErr}</p>}
-                <div className="g-gate-btns">
-                  <button
-                    type="submit"
-                    className="g-gate-btn g-gate-primary"
-                    disabled={gateBusy || !pw}
-                  >
-                    🔑 {gateBusy ? "Checking…" : "Log in"}
-                  </button>
-                  <button
-                    type="button"
-                    className="g-gate-btn"
-                    onClick={() => {
-                      setGateMode("choose");
-                      setGateErr(null);
-                    }}
-                  >
-                    Back
-                  </button>
-                </div>
-              </form>
-            )}
-            <p className="g-gate-note">
-              {relogin
-                ? "Sign in to unlock the admin tools."
-                : "Visitors can read every post. Others who are online will see you walking around."}
-            </p>
-          </div>
-        </div>
+        <GateScreen
+          art={assets?.art ?? null}
+          relogin={relogin}
+          onCancel={cancelLogin}
+          onVisitor={handleVisitor}
+          onLoggedIn={handleLoggedIn}
+          onOwnerStart={handleOwnerStart}
+        />
       )}
 
-      {(() => {
-        const open = helpPref ?? !touch;
-        return (
-          <aside className={`g-help${touch ? " g-help-touch" : ""}`}>
-            <button
-              type="button"
-              className="g-help-toggle"
-              aria-expanded={open}
-              onClick={() => setHelpPref(!open)}
-            >
-              {open ? "✕" : "?"} <span>How to play</span>
-            </button>
-            {open && (
-              <ul>
-                {touch ? (
-                  <>
-                    <li>🕹️ Hold the stick to walk</li>
-                    <li>👆 Tap a sign or house to go there</li>
-                    <li>📜 Tap the button to open it</li>
-                  </>
-                ) : (
-                  <>
-                    <li>⌨️ WASD / arrows to walk</li>
-                    <li>↵ Enter or E to open a sign</li>
-                    <li>🖱️ Click to walk or pick a sign</li>
-                  </>
-                )}
-                <li>🏘️ Town: {canAdmin ? "About · Home · Admin · Jukebox" : "About · Home · Jukebox"}</li>
-                <li>🏠 Home: cook, eat, pet the cat, sleep</li>
-                <li>😊 Emotes: buttons or keys 1-4, actions 5-7</li>
-                <li>💬 Chat: press T</li>
-                {admin && <li>👑 F: fly · Shift: speed · click the map to teleport</li>}
-                <li>🪧 Each sign down the trail is a post</li>
-                <li>🗺️ The map shows where you are</li>
-              </ul>
-            )}
-          </aside>
-        );
-      })()}
+      <HelpPanel
+        open={helpPref ?? !touch}
+        onToggle={() => setHelpPref(!(helpPref ?? !touch))}
+        touch={touch}
+        canAdmin={canAdmin}
+        admin={admin}
+      />
 
       {nearIt && !openKey && (
         <button
@@ -2004,6 +1796,13 @@ export function GameWorld({
 
       {/* Plain links so crawlers and keyboard / screen-reader users can reach
           every post without playing. */}
+      <section className="sr-only" aria-label="A note at the start of the town">
+        <p>
+          Sorry for making you feel ignored from my side. Sorry for anything I said or did that
+          didn&apos;t feel right, or felt ignorant and rude, or anything bad.
+        </p>
+      </section>
+
       <nav className="sr-only" aria-label="All posts">
         <ul>
           {stops.map((s) => (
