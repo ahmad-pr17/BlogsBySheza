@@ -1,0 +1,146 @@
+/* Board editor, TV and piano popups (they reuse .g-recipes / .g-recipes-card) */
+
+.g-board-card,
+.g-tv-card,
+.g-piano-card {
+  display: grid;
+  gap: 10px;
+}
+.g-board-card {
+  width: min(420px, 100%);
+}
+.g-board-card label {
+  display: grid;
+  gap: 4px;
+  font-size: 15px;
+}
+.g-board-card label small {
+  opacity: 0.7;
+  font-size: 13px;
+}
+.g-board-card input,
+.g-board-card textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 16px;
+  color: #3a2a18;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  resize: vertical;
+}
+.g-board-card input:focus-visible,
+.g-board-card textarea:focus-visible {
+  outline: 3px solid #f6c453;
+  outline-offset: 1px;
+}
+.g-board-err {
+  margin: 0;
+  font-size: 14px;
+  color: #a1352a;
+}
+.g-board-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.g-board-row .g-gate-btn {
+  flex: 1 1 100px;
+}
+
+.g-tv-card {
+  width: min(520px, 100%);
+}
+.g-tv-screen {
+  display: block;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  image-rendering: pixelated;
+  background: #1b1b24;
+  border: 6px solid #3a2a22;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px #8a5f45, inset 0 0 18px rgba(0, 0, 0, 0.6);
+}
+.g-tv-title {
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+}
+.g-tv-note {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.75;
+}
+.g-tv-card .g-board-row .g-gate-btn[aria-pressed="true"] {
+  background: #f6c453;
+}
+
+.g-piano-card {
+  width: min(640px, 100%);
+}
+.g-piano-keys {
+  position: relative;
+  display: flex;
+  height: 150px;
+  padding: 0 2px;
+  user-select: none;
+  touch-action: none;
+}
+.g-piano-white {
+  position: relative;
+  flex: 1 1 0;
+  margin: 0 1px;
+  font: inherit;
+  font-size: 12px;
+  color: #6b5a4a;
+  background: #fbf6ea;
+  border: 2px solid #3a2a22;
+  border-radius: 0 0 6px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+.g-piano-white.on {
+  background: #f6c453;
+}
+.g-piano-black {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  width: 5.2%;
+  height: 60%;
+  transform: translateX(-50%);
+  background: #1b1b24;
+  border: 2px solid #3a2a22;
+  border-radius: 0 0 5px 5px;
+  cursor: pointer;
+}
+.g-piano-black.on {
+  background: #6b4c9a;
+}
+
+/* the clock button: shows the time of day, click to jump to the next part */
+.g-time {
+  position: absolute;
+  top: 96px;
+  left: 14px;
+  z-index: 5;
+  padding: 5px 10px;
+  font-family: var(--font-pixelify), monospace;
+  font-size: 15px;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 3px solid var(--wood-dark);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 2px #f0c48c, 0 3px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.g-time:hover,
+.g-time:focus-visible {
+  outline: none;
+  background: #ffe29a;
+}

@@ -61,7 +61,7 @@ export function pathCenter(row: number) {
 
 const PATH_HALF = 1.9;
 
-export function buildWorld(stops: Stop[], adminHouse = false): World {
+export function buildWorld(stops: Stop[], adminHouse = false, canEdit = false): World {
   const n = stops.length;
   const lastRow = R0 + Math.max(n - 1, 0) * GAP;
   const endRow = lastRow + GAP;
@@ -122,7 +122,7 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
   const houses: { c: number; key: string; id?: string; label?: string; verb?: string }[] = [
     { c: 10, key: "houseG" },
     { c: 16, key: "house", id: "about", label: "About", verb: "Visit the About house" },
-    { c: 22, key: "home", id: "home", label: "Home", verb: "Go inside your home" },
+    { c: 22, key: "home", id: "home", label: "Sheza's Palace", verb: "Enter Sheza's Palace" },
     { c: 28, key: "houseAlt", id: "admin", label: "Admin", verb: "Enter the Admin house" },
     { c: 34, key: "houseC" },
   ];
@@ -130,8 +130,9 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
     // The Admin house is only a real door for the owner and superadmin; for
     // visitors it is just another house (no sign, nothing to enter).
     const live = !!h.id && (h.id !== "admin" || adminHouse);
+    const isCastle = h.key === "home";
     place(h.key, h.c, HOUSE_ROW, {
-      blockTiles: [h.c - 2, h.c - 1, h.c, h.c + 1].flatMap(
+      blockTiles: (isCastle ? [h.c - 3, h.c - 2, h.c - 1, h.c, h.c + 1, h.c + 2] : [h.c - 2, h.c - 1, h.c, h.c + 1]).flatMap(
         (c) => [[c, HOUSE_ROW - 1], [c, HOUSE_ROW]] as [number, number][],
       ),
       interact: live ? h.id : undefined,
@@ -145,7 +146,7 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
       verb: h.verb!,
       signX: h.c * T,
       signY: (HOUSE_ROW + 1) * T,
-      spotX: h.c * T + 8, // the door is just right of centre
+      spotX: isCastle ? h.c * T : h.c * T + 8, // the castle door is dead centre; the houses' just right of it
       spotY: (HOUSE_ROW + 1) * T + 12,
     });
   }
@@ -159,6 +160,28 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
     blockTiles: [3, 4, 5, 6, 7, 8, 9, 10].map((c) => [c, 14] as [number, number]),
   });
   reserve(3, 9, 19, 14);
+
+  // Sheza and the superadmin can change the words on the boards
+  if (canEdit) {
+    for (const [id, x, label] of [
+      ["sorry", 16.125 * T, "Edit the sorry board"],
+      ["kind", 7.125 * T, "Edit the reminders board"],
+    ] as const) {
+      interacts.push({
+        id: `board:${id}`,
+        kind: "act",
+        act: `board:${id}`,
+        label: "Board",
+        verb: label,
+        signX: x,
+        signY: 15 * T + 2,
+        spotX: x,
+        spotY: 15 * T + 14,
+        hitDy: 22,
+        hitR: 26,
+      });
+    }
+  }
 
   // square: campfire with benches, jukebox, lamps and flowers
   place("campfire", 22, 10, { blockTiles: [[21, 10], [22, 10]] });
@@ -176,7 +199,24 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
     spotX: (boxC + 0.5) * T - 10,
     spotY: 12 * T + 12,
   });
-  for (const lc of [13, 19, 25, 31]) place("lamp", lc + 0.5, 8, { blockTiles: [[lc, 8]] });
+  for (const lc of [7, 13, 19, 25, 31, 37]) place("lamp", lc + 0.5, 8, { blockTiles: [[lc, 8]] });
+  // dressing the street: flower troughs under the house windows, barrels and
+  // crates at the ends, golden topiary round the palace door, a welcome rug,
+  // a market stall and a well
+  for (const hc of [10, 16, 28, 34]) {
+    place("planter", hc - 1.5, 7.5);
+    place("planter", hc + 1.9, 7.5);
+  }
+  place("barrel", 11.9, 8, { blockTiles: [[11, 8]] });
+  place("crate", 9.2, 8, { blockTiles: [[9, 8]] });
+  place("barrel", 35.6, 8, { blockTiles: [[35, 8]] });
+  place("crate", 36.2, 9, { blockTiles: [[36, 9]] });
+  place("topiary", 20.4, 8, { blockTiles: [[20, 8]] });
+  place("topiary", 23.6, 8, { blockTiles: [[23, 8]] });
+  place("f_welcome", 22, 8.5, { flat: true });
+  place("stall", 33, 11, { blockTiles: [[32, 11], [33, 11]] });
+  place("well", 36.5, 11, { blockTiles: [[36, 11]] });
+  reserve(30, 8, 39, 13);
   for (const [fx, fy] of [[15, 12], [16, 13], [27, 13], [30, 9], [12, 11], [33, 11], [9, 11], [14, 11]])
     place(`flower${(fx + fy) % 4}`, fx + 0.5, fy);
 
@@ -218,6 +258,21 @@ export function buildWorld(stops: Stop[], adminHouse = false): World {
           }
         }
       reserve(fc - 6, fr - 4, fc + 6, fr + 4);
+      // a fishing spot on the bank nearest the trail
+      const bank = pathCenter(fr) >= fc ? 1 : -1;
+      interacts.push({
+        id: `fish:${i}`,
+        kind: "act",
+        act: "fish",
+        label: "Pond",
+        verb: "Go fishing",
+        signX: (fc + bank * 4) * T + 8,
+        signY: fr * T + 14,
+        spotX: (fc + bank * 5) * T + 8,
+        spotY: fr * T + 8,
+        hitDy: 12,
+        hitR: 24,
+      });
     } else if (k === 1) {
       // campfire with benches
       place("campfire", fc + 0.5, fr, { blockTiles: [[fc, fr]] });

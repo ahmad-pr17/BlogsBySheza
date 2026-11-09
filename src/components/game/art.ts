@@ -1,5 +1,6 @@
 import { buildAnimalSheet } from "@/components/game/animals";
 import { homeProps } from "@/components/game/homeArt";
+import { palaceProps } from "@/components/game/palaceArt";
 
 // Art: tiles and sprites come from the "Sprout Lands" pack by Cup Nooble
 // (see public/game/CREDITS.txt). A few props the pack doesn't have (signs,
@@ -271,7 +272,7 @@ export async function loadArt(): Promise<Art> {
     loadSprites(base),
   ]);
 
-  const sprites: Record<string, Img | Img[]> = { ...drawnProps(), ...homeProps() };
+  const sprites: Record<string, Img | Img[]> = { ...drawnProps(), ...homeProps(), ...palaceProps() };
   // World keys -> pack sprites.
   const alias: Record<string, string> = {
     tree0: "treeA", tree1: "treeB", tree2: "treeC", tree3: "treeD",
@@ -287,6 +288,7 @@ export async function loadArt(): Promise<Art> {
     bench: "bench", picnic: "blanket", basket: "basket",
   };
   for (const [k, v] of Object.entries(alias)) sprites[k] = raw[v];
+  sprites.home = sprites.castle; // the Home is now a palace
   for (const n of FILES) if (n.startsWith("f_")) sprites[n] = raw[n];
   sprites.campfire = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => raw[`campfire${i}`]);
 

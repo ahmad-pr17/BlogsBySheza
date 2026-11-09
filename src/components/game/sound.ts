@@ -10,7 +10,14 @@ export type SoundName =
   | "door"
   | "sizzle"
   | "chime"
-  | "bird";
+  | "bird"
+  | "tap"
+  | "good"
+  | "bad"
+  | "splash"
+  | "page"
+  | "fanfare"
+  | "cricket";
 
 const KEY = "trail-sound";
 
@@ -126,6 +133,31 @@ function createSound() {
       case "chime":
         [523, 659, 784].forEach((f, i) => tone(f, 0.3, "sine", 0.1, undefined, i * 0.12));
         break;
+      case "tap":
+        tone(540 + Math.random() * 120, 0.05, "square", 0.05, 420);
+        break;
+      case "good":
+        tone(660, 0.1, "sine", 0.1);
+        tone(990, 0.14, "sine", 0.1, undefined, 0.08);
+        break;
+      case "bad":
+        tone(200, 0.18, "sawtooth", 0.07, 120);
+        break;
+      case "splash":
+        noise(0.35, 0.18, "bandpass", 1400);
+        tone(300, 0.15, "sine", 0.06, 120);
+        break;
+      case "page":
+        noise(0.09, 0.12, "highpass", 2500);
+        break;
+      case "fanfare":
+        [392, 392, 523, 659, 784].forEach((f, i) => tone(f, i === 4 ? 0.5 : 0.16, "square", 0.05, undefined, i * 0.15));
+        break;
+      case "cricket": {
+        const base = 3600 + Math.random() * 500;
+        for (let i = 0; i < 3; i++) tone(base, 0.035, "square", 0.012, undefined, i * 0.07);
+        break;
+      }
       case "bird": {
         const base = 2200 + Math.random() * 900;
         tone(base, 0.08, "sine", 0.04, base * 1.4);
@@ -138,6 +170,12 @@ function createSound() {
 
   return {
     play,
+    // a soft piano-ish note for the living-room piano
+    note(freq: number) {
+      if (muted) return;
+      tone(freq, 0.9, "triangle", 0.16);
+      tone(freq * 2, 0.5, "sine", 0.05);
+    },
     unlock() {
       ensure();
     },

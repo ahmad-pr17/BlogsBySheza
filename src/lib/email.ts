@@ -200,3 +200,31 @@ export async function notifySubscribersOfPost(
     ),
   );
 }
+
+// A notice board in the town was edited: tell the owner address(es) only
+// (not the subscribers).
+export async function notifyOwnerOfBoardChange(
+  boardName: string,
+  board: { title: string; lines: string[] },
+  editedBy: string,
+): Promise<void> {
+  const owners = ownerEmails();
+  if (owners.length === 0) {
+    console.warn("[email] no OWNER_EMAIL set — board notification skipped.");
+    return;
+  }
+
+  await send({
+    to: owners,
+    subject: `The ${boardName} board was edited`,
+    html: `
+      <h2>The ${escapeHtml(boardName)} board was edited</h2>
+      <p>Edited by <strong>${escapeHtml(editedBy)}</strong>. It now says:</p>
+      <blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#444">
+        <strong>${escapeHtml(board.title)}</strong><br>
+        ${board.lines.map(escapeHtml).join("<br>")}
+      </blockquote>
+      <p><a href="${siteUrl()}">Open the town</a></p>
+    `,
+  });
+}

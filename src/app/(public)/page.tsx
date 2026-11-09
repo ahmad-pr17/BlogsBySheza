@@ -6,6 +6,7 @@ import { getCommentsByPost } from "@/lib/comments";
 import { formatPostDate } from "@/lib/format";
 import { getPublishedPosts } from "@/lib/posts";
 import { getAllSongs } from "@/lib/songs";
+import { getBoards } from "@/lib/boards";
 import { AboutContent } from "@/components/AboutContent";
 import { SongContent } from "@/components/SongContent";
 import { getReactionCountsByPost } from "@/lib/reactionCounts";
@@ -35,7 +36,7 @@ export default async function Home({
   const initialPage =
     pageParam === "about" || pageParam === "song" ? pageParam : undefined;
 
-  const posts = await getPublishedPosts();
+  const [posts, boards] = await Promise.all([getPublishedPosts(), getBoards()]);
   const postIds = posts.map((p) => p.id);
   const [commentsByPost, reactionsByPost] = await Promise.all([
     getCommentsByPost(postIds),
@@ -107,6 +108,7 @@ export default async function Home({
       nodes={nodes}
       initialSlug={initialSlug}
       initialPage={initialPage}
+      boards={boards}
     />
   );
 }

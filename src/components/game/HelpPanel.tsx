@@ -37,7 +37,8 @@ export function HelpPanel({
           <li>
             🏘️ Town: {canAdmin ? "About · Home · Admin · Jukebox" : "About · Home · Jukebox"}
           </li>
-          <li>🏠 Home: cook, eat, pet the cat, sleep</li>
+          <li>🏰 Palace: cook, watch TV, read in the study, sleep upstairs</li>
+          <li>🎣 Click a pond to go fishing</li>
           <li>😊 Emotes: buttons or keys 1-4, actions 5-7</li>
           <li>💬 Chat: press T · 🔊 Sound: press M</li>
           {admin && <li>👑 F: fly · Shift: speed · click the map to teleport</li>}

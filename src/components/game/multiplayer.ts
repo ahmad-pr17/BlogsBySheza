@@ -6,7 +6,9 @@ import { cleanRemoteMessage, cleanRemoteName } from "@/components/game/names";
 //
 // Nothing is stored: positions are broadcast only while a visitor is online.
 
-export type Scene = "out" | "home";
+import { type Scene, sceneCode, sceneFromCode } from "@/components/game/scenes";
+
+export type { Scene };
 
 export type Remote = {
   id: string; // Ably clientId
@@ -85,6 +87,7 @@ export function connectMultiplayer(opts: {
   onCount: (n: number) => void;
   onEvent?: (kind: "chat" | "emote") => void; // someone else spoke or emoted
   onSilenced?: (ms: number) => void; // a moderator silenced you
+  onBoard?: (id: string, board: unknown) => void; // a notice board was edited
 }): Multiplayer {
   const remotes = new Map<string, Remote>();
   const meta = new Map<string, { name: string; kind: string; tint: number }>();
@@ -161,7 +164,7 @@ export function connectMultiplayer(opts: {
         r.dir = typeof d.d === "number" ? d.d : r.dir;
         r.moving = d.m === 1;
         r.fly = d.f === 1;
-        r.scene = d.s === 1 ? "home" : "out";
+        r.scene = sceneFromCode(d.s);
         r.reading = typeof d.r === "string" ? d.r.slice(0, 80) : "";
         r.seen = Date.now();
       });
@@ -188,6 +191,13 @@ export function connectMultiplayer(opts: {
         if (msg.clientId === me()) return;
         lastSent = 0;
         lastKey = "";
+      });
+
+      // A notice board was edited (sent by the server, after checking the login).
+      await channel.subscribe("board", (msg) => {
+        if (msg.clientId !== "server:mod") return;
+        const d = msg.data as { id?: string; board?: unknown };
+        if (typeof d?.id === "string") opts.onBoard?.(d.id, d.board);
       });
 
       // Moderator silences. Only the server may send these (reserved sender).
@@ -320,7 +330,7 @@ export function connectMultiplayer(opts: {
           d: s.dir,
           m: s.moving ? 1 : 0,
           f: s.fly ? 1 : 0,
-          s: s.scene === "home" ? 1 : 0,
+          s: sceneCode(s.scene),
           r: s.read,
         })
         .catch(() => {});

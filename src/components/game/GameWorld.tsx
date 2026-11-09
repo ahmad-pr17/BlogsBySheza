@@ -12,20 +12,36 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PostModal } from "@/components/game/PostModal";
-import { DAY_NIGHT_ENABLED, darknessAt, labelAt, skipSeconds } from "@/components/game/daynight";
+import { DAY_NIGHT_ENABLED, lightAt, nextPeriodSeconds, skipSeconds, type Light } from "@/components/game/daynight";
 import { mulberry32 } from "@/components/game/rng";
-import { sound } from "@/components/game/sound";
+import { sound, type SoundName } from "@/components/game/sound";
 import { loadArt, type Art } from "@/components/game/art";
 import { buildGround, type Ground } from "@/components/game/ground";
 import {
-  buildHome,
-  buildHomeBg,
-  drawHomeScene,
+  arrival,
+  buildRoom,
+  buildRoomBg,
+  drawRoomScene,
+  KNIGHT_LINES,
   stageFor,
   UNLOCK_AT,
   UNLOCK_TEXT,
-  type HomeDrawState,
-} from "@/components/game/home";
+  type RoomDrawState,
+} from "@/components/game/palace";
+import type { RoomId, Scene } from "@/components/game/scenes";
+import { BoardEditor } from "@/components/game/BoardEditor";
+import { CookingGame } from "@/components/game/CookingGame";
+import { FishingGame } from "@/components/game/FishingGame";
+import { Library } from "@/components/game/Library";
+import { PianoModal } from "@/components/game/PianoModal";
+import { TvModal } from "@/components/game/TvModal";
+import {
+  cleanBoard,
+  isBoardId,
+  type BoardId,
+  type BoardText,
+  type BoardTexts,
+} from "@/lib/boardText";
 import {
   DEFAULT_CHOICE,
   FOX_CHOICE,
@@ -72,25 +88,37 @@ const PAGE_URL: Record<string, string> = {
 const BIG = new Set(["about", "admin", "home"]); // house-sized interactables
 const HOME_KEY = "trail-home";
 
-// The apology on the big board at the start point.
-const SORRY_LINES = [
-  "Sorry for making you feel ignored",
-  "from my side.",
-  "Sorry for anything I said or did that didn't",
-  "feel right, or felt ignorant and rude,",
-  "or anything bad.",
-];
+// The words on a notice board, drawn onto the board sprite so they stay sharp
+// (the board's text can be edited in the game, so it is not baked into the art).
+function drawBoardText(
+  ctx: CanvasRenderingContext2D,
+  family: string,
+  b: BoardText,
+  cx: number,
+  top: number,
+  wide: boolean,
+) {
+  const fit = (text: string, y: number, size: number, maxW: number) => {
+    ctx.font = `${size}px ${family}`;
+    const w = ctx.measureText(text).width;
+    if (w > maxW) ctx.font = `${((size * maxW) / w).toFixed(2)}px ${family}`;
+    ctx.fillText(text, cx, y);
+  };
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const maxW = wide ? 124 : 108;
+  if (b.title) {
+    ctx.fillStyle = "#a1352a";
+    fit(b.title, top + (wide ? 20 : 18), wide ? 14 : 10, wide ? 100 : 84);
+  }
+  const n = b.lines.length;
+  const first = top + (wide ? 30 : 29);
+  const step = Math.min(wide ? 7.2 : 6.6, 28 / Math.max(1, n - 1));
+  ctx.fillStyle = "#3a2a18";
+  b.lines.forEach((line, i) => fit(line, first + i * step, step < 6 ? 4.8 : wide ? 5.6 : 5.2, maxW));
+  ctx.textAlign = "start";
+}
 
-// The kind reminders on the second board.
-const KIND_LINES = [
-  "It's normal to laugh when someone trips.",
-  "It's okay to notice change in yourself.",
-  "You are not toxic.",
-  "Things take their own time and way.",
-  "Believe and trust Allah.",
-];
-
-type Scene = "out" | "home";
 type Role = "visitor" | "owner" | "super";
 
 
@@ -111,9 +139,11 @@ export function GameWorld({
   nodes,
   initialSlug,
   initialPage,
+  boards: initialBoards,
 }: {
   stops: Stop[];
   nodes: Record<string, ReactNode>;
+  boards: BoardTexts;
   initialSlug?: string;
   initialPage?: "about" | "song";
 }) {
@@ -124,11 +154,20 @@ export function GameWorld({
   const admin = role === "super";
   const owner = role === "owner";
   const canAdmin = role !== "visitor";
-  const world = useMemo(() => buildWorld(stops, canAdmin), [stops, canAdmin]);
+  const world = useMemo(() => buildWorld(stops, canAdmin, canAdmin), [stops, canAdmin]);
   const [cooked, setCooked] = useState(0); // meals cooked in this browser
   const homeStage = stageFor(cooked);
-  const home = useMemo(() => buildHome(homeStage), [homeStage]);
-  const scenes = useMemo(() => ({ out: world, home }), [world, home]);
+  const rooms = useMemo(
+    () => ({
+      home: buildRoom("home", homeStage),
+      kitchen: buildRoom("kitchen", homeStage),
+      living: buildRoom("living", homeStage),
+      bedroom: buildRoom("bedroom", homeStage),
+      study: buildRoom("study", homeStage),
+    }),
+    [homeStage],
+  );
+  const scenes = useMemo(() => ({ out: world, ...rooms }), [world, rooms]);
 
   const initialInteract = initialSlug
     ? world.interacts.find((i) => i.slug === initialSlug)
@@ -149,6 +188,15 @@ export function GameWorld({
   const soundMuted = useSyncExternalStore(sound.subscribe, sound.isMuted, () => false);
   const [chatOpen, setChatOpen] = useState(false);
   const [recipesOpen, setRecipesOpen] = useState(false);
+  const [boards, setBoards] = useState<BoardTexts>(initialBoards);
+  const boardsRef = useRef(boards);
+  const [editBoard, setEditBoard] = useState<BoardId | null>(null);
+  const [cookIdx, setCookIdx] = useState<number | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [fishing, setFishing] = useState(false);
+  const [tvOpen, setTvOpen] = useState(false);
+  const [tvChannel, setTvChannel] = useState(1);
+  const [pianoOpen, setPianoOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [chatText, setChatText] = useState("");
@@ -168,7 +216,7 @@ export function GameWorld({
   const [assets, setAssets] = useState<{
     art: Art;
     ground: Ground;
-    homeBg: HTMLCanvasElement;
+    roomBgs: Record<RoomId, HTMLCanvasElement>;
   } | null>(null);
   const [scene, setScene] = useState<Scene>("out");
   const [toast, setToast] = useState<string | null>(null);
@@ -208,6 +256,9 @@ export function GameWorld({
     cookRecipe: 0,
     cooked: 0, // mirror of the cooked state, for the frame loop
     dish: null as string | null,
+    tv: 1, // the channel the living-room TV shows
+    knightTalk: 0,
+    globeSpins: 0,
     dishName: "",
     night: false,
     dayShift: 0, // seconds: sleeping skips your own view of the clock ahead
@@ -241,6 +292,9 @@ export function GameWorld({
     },
     [],
   );
+  useEffect(() => {
+    boardsRef.current = boards;
+  }, [boards]);
 
   const dismissGate = useCallback(() => {
     sound.unlock(); // a click got us here, so the browser lets sound start
@@ -319,6 +373,10 @@ export function GameWorld({
         setMpOn(true);
       },
       onEvent: (kind) => sound.play(kind === "chat" ? "chat" : "pop"),
+      onBoard: (id, board) => {
+        const clean = cleanBoard(board);
+        if (isBoardId(id) && clean) setBoards((prev) => ({ ...prev, [id]: clean }));
+      },
       onSilenced: (ms) => {
         g.current.silencedUntil = performance.now() + ms;
         showToast(
@@ -421,19 +479,56 @@ export function GameWorld({
     }
   };
 
-  // Choose a recipe from the book and start cooking.
+  // Choose a recipe from the book: the cooking game opens.
   const startCooking = (i: number) => {
     const s = g.current;
     const r = RECIPES[i];
     if (!r || s.cooked < r.need) return;
     s.cookRecipe = i;
-    s.cookSecs = r.secs;
-    s.cook = 0;
+    s.cook = 0.5; // steam over the stove while you cook
     s.dir = 0;
-    s.open = false;
+    s.open = true;
     s.busy = true;
     setRecipesOpen(false);
+    setCookIdx(i);
     sound.play("sizzle");
+  };
+  const cancelCooking = () => {
+    const s = g.current;
+    s.cook = -1;
+    s.open = false;
+    s.busy = false;
+    setCookIdx(null);
+  };
+  const finishCooking = (stars: number) => {
+    const s = g.current;
+    const r = RECIPES[s.cookRecipe] ?? RECIPES[0];
+    s.cook = -1;
+    s.open = false;
+    s.busy = false;
+    s.dish = r.key;
+    s.dishName = r.name;
+    s.cooked += 1;
+    const before = stageFor(s.cooked - 1);
+    const after = stageFor(s.cooked);
+    try {
+      localStorage.setItem(HOME_KEY, JSON.stringify({ cooked: s.cooked }));
+    } catch {
+      /* ignore */
+    }
+    setCooked(s.cooked);
+    setCookIdx(null);
+    const rating = "⭐".repeat(stars);
+    showToast(
+      after > before
+        ? `${rating} You cooked ${r.name}! The palace got cosier: ${UNLOCK_TEXT[after - 1]}.`
+        : `${rating} You cooked ${r.name}! It is on the table.`,
+    );
+    sound.play("chime");
+  };
+  const changeChannel = (n: number) => {
+    g.current.tv = n;
+    setTvChannel(n);
   };
   const closeRecipes = () => {
     g.current.open = false;
@@ -552,15 +647,17 @@ export function GameWorld({
   const switchScene = useCallback(
     (to: Scene) => {
       const s = g.current;
+      const from = s.scene;
       sound.play("door");
       s.scene = to;
       s.near = null;
       setNearId(null);
       setScene(to);
-      if (to === "home") {
-        s.x = home.start.x;
-        s.y = home.start.y;
-        s.dir = 0;
+      if (to !== "out") {
+        const a = arrival(to, from);
+        s.x = a.x;
+        s.y = a.y;
+        s.dir = a.dir;
       } else {
         const door = world.interacts.find((i) => i.id === "home");
         if (door) {
@@ -570,12 +667,43 @@ export function GameWorld({
         s.dir = 4;
       }
     },
-    [home, world],
+    [world],
   );
+
+  // Popups (library, fishing, TV, piano, board editor): you stand still while one is open.
+  const openPopup = useCallback((show: () => void) => {
+    const s = g.current;
+    s.target = null;
+    s.route = [];
+    s.keys.clear();
+    s.open = true;
+    show();
+  }, []);
+  const closePopup = useCallback((hide: () => void) => {
+    g.current.open = false;
+    hide();
+  }, []);
+  const playSound = useCallback((name: string) => sound.play(name as SoundName), []);
 
   const handleAct = useCallback(
     (what: string) => {
       const s = g.current;
+      if (what.startsWith("go:")) {
+        const to = what.slice(3) as Scene;
+        fadeTo(() => switchScene(to));
+        return;
+      }
+      if (what.startsWith("knight:")) {
+        const lines = KNIGHT_LINES[Number(what.slice(7))] ?? KNIGHT_LINES[0];
+        showToast(`💂 ${lines[s.knightTalk++ % lines.length]}`);
+        sound.play("pop");
+        return;
+      }
+      if (what.startsWith("board:")) {
+        const id = what.slice(6);
+        if (isBoardId(id)) openPopup(() => setEditBoard(id));
+        return;
+      }
       switch (what) {
         case "leave":
           fadeTo(() => switchScene("out"));
@@ -592,10 +720,7 @@ export function GameWorld({
             showToast(`The table already has ${s.dishName}. Eat it first!`);
             break;
           }
-          s.target = null;
-          s.keys.clear();
-          s.open = true; // the recipe book is open: stand still
-          setRecipesOpen(true);
+          openPopup(() => setRecipesOpen(true)); // the recipe book is open: stand still
           break;
         case "eat":
           if (!s.dish) {
@@ -610,11 +735,44 @@ export function GameWorld({
           showToast("Purrrr…");
           break;
         case "books":
-          showToast("Dev logs, sketchbooks and half-finished plans.");
+          openPopup(() => setLibraryOpen(true));
+          break;
+        case "throne":
+          s.myEmote = { k: "👑", at: performance.now() };
+          mpRef.current?.emote("👑");
+          sound.play("fanfare");
+          showToast("👑 You sit on the throne. Long live the monarch!");
+          break;
+        case "tv":
+          openPopup(() => setTvOpen(true));
+          break;
+        case "piano":
+          openPopup(() => setPianoOpen(true));
+          break;
+        case "mirror":
+          s.myEmote = { k: "✨", at: performance.now() };
+          mpRef.current?.emote("✨");
+          sound.play("chime");
+          showToast("✨ You look lovely today.");
+          break;
+        case "globe": {
+          const facts = [
+            "The globe spins... and stops on the ocean. Mostly water down there!",
+            "It stops on Japan. Cherry blossoms and ramen shops.",
+            "It stops on the Pacific. Home to the deepest trench on Earth.",
+            "It stops on Malaysia. Pineapple tart season is the best season.",
+            "It stops on Pakistan. Somewhere, someone is making biryani right now.",
+          ];
+          showToast(`🌍 ${facts[s.globeSpins++ % facts.length]}`);
+          sound.play("page");
+          break;
+        }
+        case "fish":
+          openPopup(() => setFishing(true));
           break;
       }
     },
-    [fadeTo, switchScene, showToast],
+    [fadeTo, switchScene, showToast, openPopup],
   );
 
   const activate = useCallback(
@@ -703,7 +861,13 @@ export function GameWorld({
     loadArt()
       .then((art) => {
         if (alive)
-          setAssets({ art, ground: buildGround(world, art), homeBg: buildHomeBg(art) });
+          setAssets({
+            art,
+            ground: buildGround(world, art),
+            roomBgs: Object.fromEntries(
+              (["home", "kitchen", "living", "bedroom", "study"] as RoomId[]).map((id) => [id, buildRoomBg(id, art)]),
+            ) as Record<RoomId, HTMLCanvasElement>,
+          });
       })
       .catch(() => {});
     return () => {
@@ -717,7 +881,7 @@ export function GameWorld({
     if (!canvas || !assets) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const { art, ground, homeBg } = assets;
+    const { art, ground, roomBgs } = assets;
     const s = g.current;
     const cur = () => scenes[s.scene];
     const family =
@@ -731,7 +895,7 @@ export function GameWorld({
       const cw = window.innerWidth;
       const ch = window.innerHeight;
       const dpr = window.devicePixelRatio || 1;
-      const target = cw < 640 ? 2 : cw < 1100 ? 3 : 4;
+      const target = cw < 640 ? 2 : cw < 1700 ? 3 : 4;
       s.dpr = dpr;
       s.S = Math.max(1, Math.round(target * dpr));
       canvas.width = Math.round(cw * dpr);
@@ -860,6 +1024,7 @@ export function GameWorld({
       ctx.fillText(t, x + 6 * u, y + h / 2 + 1);
     };
 
+    const maskCv = document.createElement("canvas"); // the night, with holes where the lights are
     let raf = 0;
     let stepAcc = 0; // time since the last footstep sound
     let birdIn = 5; // seconds until the next bird chirps
@@ -873,9 +1038,10 @@ export function GameWorld({
       const W = cur();
 
       // ---- time of day (shared clock; calm mode stays in daylight) ----
-      const dark = reduceMotion ? 0 : darknessAt(s.dayShift);
+      const light: Light = lightAt(s.dayShift);
+      const dark = light.dark;
       s.night = dark > 0.5;
-      const timeText = reduceMotion ? "☀️ Day" : labelAt(s.dayShift);
+      const timeText = light.label;
       if (timeText !== s.timeLabel) {
         s.timeLabel = timeText;
         setTimeLabel(timeText);
@@ -913,31 +1079,7 @@ export function GameWorld({
         } else if (k.t < 3.6) sleepA = 1 - (k.t - 2.7) / 0.9;
         else {
           s.sleep = null;
-          act.current.toast(s.night ? "You slept until evening. Cozy..." : "Good morning!");
-        }
-      }
-      if (s.cook >= 0) {
-        s.cook += dt / s.cookSecs;
-        if (s.cook >= 1) {
-          s.cook = -1;
-          const r = RECIPES[s.cookRecipe] ?? RECIPES[0];
-          s.dish = r.key;
-          s.dishName = r.name;
-          s.cooked += 1;
-          const before = stageFor(s.cooked - 1);
-          const after = stageFor(s.cooked);
-          try {
-            localStorage.setItem(HOME_KEY, JSON.stringify({ cooked: s.cooked }));
-          } catch {
-            /* ignore */
-          }
-          act.current.cooked(s.cooked);
-          act.current.toast(
-            after > before
-              ? `You cooked ${r.name}! Your home got cozier: ${UNLOCK_TEXT[after - 1]}.`
-              : `You cooked ${r.name}! It is on the table.`,
-          );
-          sound.play("chime");
+          act.current.toast(`You slept until ${lightAt(s.dayShift).label.replace(/^\S+\s/, "").toLowerCase()}. Cozy...`);
         }
       }
       s.busy = !!s.fade || !!s.sleep || s.cook >= 0;
@@ -946,7 +1088,7 @@ export function GameWorld({
       birdIn -= dt;
       if (birdIn <= 0) {
         birdIn = 6 + Math.random() * 9;
-        if (s.scene === "out" && !s.open) sound.play("bird");
+        if (s.scene === "out" && !s.open) sound.play(dark < 0.45 ? "bird" : "cricket");
       }
 
       // ---- update ----
@@ -995,7 +1137,7 @@ export function GameWorld({
         const nx = s.x + vx * sp * dt;
         const ny = s.y + vy * sp * dt;
         if (s.fly) {
-          const inHome = s.scene === "home";
+          const inHome = s.scene !== "out";
           s.x = clamp(nx, 24, inHome ? 296 : W.w - 24);
           s.y = clamp(ny, inHome ? 72 : 24, inHome ? 214 : W.h - 10);
         } else {
@@ -1020,7 +1162,7 @@ export function GameWorld({
             stepAcc += dt;
             if (stepAcc > 0.32) {
               stepAcc = 0;
-              sound.play(s.scene === "home" ? "stepWood" : "step");
+              sound.play(s.scene !== "out" ? "stepWood" : "step");
             }
           }
         } else stepAcc = 0;
@@ -1078,7 +1220,7 @@ export function GameWorld({
       // ---- draw ----
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = s.scene === "home" ? "#2a1b14" : "#1d3a1f";
+      ctx.fillStyle = s.scene !== "out" ? "#2a1b14" : "#1d3a1f";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(S, 0, 0, S, -s.camX * S, -s.camY * S);
 
@@ -1175,7 +1317,7 @@ export function GameWorld({
       const myKind: CharKind = s.admin ? "fox" : s.me.kind;
       const myTint = s.admin ? 0 : s.me.tint;
       const actors: { y: number; draw: () => void }[] = [];
-      if (!(s.scene === "home" && s.sleep)) {
+      if (!(s.scene === "bedroom" && s.sleep)) {
         actors.push({
           y: s.fly ? 1e9 : s.y,
           draw: () => {
@@ -1317,38 +1459,22 @@ export function GameWorld({
         }
       };
 
-      if (s.scene === "home") {
-        const hs: HomeDrawState = {
+      if (s.scene !== "out") {
+        const hs: RoomDrawState = {
           night: s.night,
+          light,
           cook: s.cook,
           dish: s.dish,
           sleeping: !!s.sleep,
           heartT: s.heartT,
           x: s.x,
           y: s.y,
+          tv: s.tv,
         };
-        drawHomeScene(
-          ctx,
-          art,
-          homeBg,
-          W,
-          hs,
-          t,
-          actors,
-        );
+        drawRoomScene(ctx, art, roomBgs[s.scene], s.scene, W, hs, t, actors);
 
-        // screen-space: cooking bar and the label of whatever you are at
+        // screen-space: the label of whatever you are at
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        if (s.cook >= 0) {
-          const bx = (256 - s.camX - 18) * S;
-          const by = (34 - s.camY) * S;
-          ctx.fillStyle = "#7a4a22";
-          ctx.fillRect(bx - 2 * S, by - 2 * S, 40 * S, 7 * S);
-          ctx.fillStyle = "#3a2a18";
-          ctx.fillRect(bx, by, 36 * S, 3 * S);
-          ctx.fillStyle = "#f6c453";
-          ctx.fillRect(bx, by, Math.round(36 * S * Math.min(1, s.cook)), 3 * S);
-        }
         const nearIt = W.interacts.find((i) => i.id === s.near);
         if (nearIt && !s.busy) {
           drawTag(nearIt.label, (nearIt.signX - s.camX) * S, (nearIt.signY - 30 - s.camY) * S, true);
@@ -1420,53 +1546,56 @@ export function GameWorld({
         while (ai < actors.length && o.y > actors[ai].y) actors[ai++].draw();
         const cv = spriteFor(o.key, o.interact);
         ctx.drawImage(cv, Math.round(o.x - cv.width / 2), Math.round(o.y - cv.height));
-        if (o.key === "sorryBoard") {
-          // the words on the board (drawn as text so they stay sharp)
-          const cx = Math.round(o.x);
+        if (o.key === "home") {
+          // golden light on the palace: glowing windows and door, twinkling fairy lights
+          const left = Math.round(o.x - cv.width / 2);
           const top = Math.round(o.y - cv.height);
-          ctx.textAlign = "center";
-          ctx.textBaseline = "alphabetic";
-          ctx.fillStyle = "#a1352a";
-          ctx.font = `14px ${family}`;
-          ctx.fillText("SORRY", cx, top + 20);
-          ctx.fillStyle = "#3a2a18";
-          ctx.font = `5.6px ${family}`;
-          SORRY_LINES.forEach((line, i) =>
-            ctx.fillText(line, cx, top + 30 + i * 7 + (i >= 2 ? 3 : 0)),
-          );
-          ctx.textAlign = "start";
+          const beat = reduceMotion ? 1 : 1 + Math.sin(t * 2.2) * 0.1;
+          ctx.globalCompositeOperation = "lighter";
+          for (const [gx, gy, gr, ga] of [
+            [36, 53, 13, 0.5],
+            [70, 53, 13, 0.5],
+            [52, 92, 22, 0.4],
+          ] as const) {
+            const g = ctx.createRadialGradient(left + gx, top + gy, 0, left + gx, top + gy, gr * beat);
+            g.addColorStop(0, `rgba(255,214,90,${ga * (1 - dark * 0.45)})`);
+            g.addColorStop(1, "rgba(255,214,90,0)");
+            ctx.fillStyle = g;
+            ctx.fillRect(left + gx - gr * 1.2, top + gy - gr * 1.2, gr * 2.4, gr * 2.4);
+          }
+          ctx.globalCompositeOperation = "source-over";
+          for (let i = 0; i < 14; i++) {
+            const lx = left + 6 + i * 6.6;
+            const ly = top + 70 + Math.sin(i * 0.9) * 2 + (i % 2) * 2;
+            const on = reduceMotion || Math.sin(t * 3 + i * 1.7) > -0.2;
+            ctx.fillStyle = on ? "#fff6b0" : "#c9a95a";
+            ctx.fillRect(Math.round(lx), Math.round(ly), 2, 2);
+            if (on) {
+              ctx.fillStyle = "rgba(255,230,120,0.25)";
+              ctx.fillRect(Math.round(lx) - 1, Math.round(ly) - 1, 4, 4);
+            }
+          }
+          if (!reduceMotion)
+            for (let i = 0; i < 7; i++) {
+              const age = (t * 0.6 + i * 0.37) % 1;
+              ctx.fillStyle = `rgba(255,240,160,${1 - age})`;
+              const sx = left + 8 + ((i * 53) % 90);
+              ctx.fillRect(Math.round(sx), Math.round(top + 20 - age * 16), 1 + (i % 2), 1 + (i % 2));
+            }
         }
-        if (o.key === "kindBoard") {
-          const cx = Math.round(o.x);
-          const top = Math.round(o.y - cv.height);
-          ctx.textAlign = "center";
-          ctx.textBaseline = "alphabetic";
-          ctx.fillStyle = "#a1352a";
-          ctx.font = `10px ${family}`;
-          ctx.fillText("REMEMBER", cx, top + 18);
-          ctx.fillStyle = "#3a2a18";
-          ctx.font = `5.2px ${family}`;
-          KIND_LINES.forEach((line, i) => ctx.fillText(line, cx, top + 29 + i * 6.6));
-          ctx.textAlign = "start";
+        if (o.key === "sorryBoard" || o.key === "kindBoard") {
+          const wide = o.key === "sorryBoard";
+          drawBoardText(
+            ctx,
+            family,
+            boardsRef.current[wide ? "sorry" : "kind"],
+            Math.round(o.x),
+            Math.round(o.y - cv.height),
+            wide,
+          );
         }
       }
       while (ai < actors.length) actors[ai++].draw();
-
-      // fireflies over the grass (only the ones on screen)
-      for (const f of reduceMotion ? [] : flies) {
-        if (f.x < s.camX - 12 || f.x > s.camX + vw + 12 || f.y < s.camY - 12 || f.y > s.camY + vh + 12) continue;
-        const a = Math.max(0, Math.sin(t * 1.7 + f.p * 3));
-        const glow = Math.min(1, (0.25 + 0.75 * a * a) * (0.6 + dark * 1.1));
-        const fx = Math.round(f.x + Math.sin(t * 0.6 + f.p) * 9);
-        const fy = Math.round(f.y + Math.cos(t * 0.8 + f.p * 1.3) * 6 - 6);
-        ctx.fillStyle = `rgba(255,170,40,${0.2 * glow})`;
-        ctx.fillRect(fx - 3, fy - 3, 7, 7);
-        ctx.fillStyle = `rgba(255,190,50,${0.5 * glow})`;
-        ctx.fillRect(fx - 1, fy - 2, 3, 5);
-        ctx.fillRect(fx - 2, fy - 1, 5, 3);
-        ctx.fillStyle = `rgba(255,250,170,${0.5 + 0.5 * glow})`;
-        ctx.fillRect(fx - 1, fy - 1, 2, 2);
-      }
 
       // "!" over unread posts
       const bob = Math.round(Math.sin(t * 4) * 1.5);
@@ -1475,34 +1604,222 @@ export function GameWorld({
         ctx.drawImage(art.sprites.exclaim as HTMLCanvasElement, Math.round(it.signX - 4), Math.round(it.signY - 48 + bob));
       }
 
-      // dusk and night: dim the world, light the lamps and the campfire
-      if (dark > 0.02) {
+      // time of day: grade the whole picture. By dusk and night the colour
+      // tint is a multiply layer with holes where lamps, windows and fires
+      // shine, so lit places keep their warm colours while the rest goes
+      // deep, saturated blue.
+      {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = `rgba(14,20,66,${0.5 * dark})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = `rgba(255,140,60,${0.13 * Math.sin(Math.PI * Math.min(1, dark))})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const cw = canvas.width;
+        const chh = canvas.height;
+        const mult = `rgb(${Math.round(light.mult[0])},${Math.round(light.mult[1])},${Math.round(light.mult[2])})`;
+        const dim = light.mult[0] + light.mult[1] + light.mult[2] < 760;
+        const pools: [number, number, number, number, string][] = []; // screen x, y, radius, hole, colour
+        const ramp = Math.min(1, Math.max(0, (dark - 0.25) / 0.5)); // lights matter from dusk
+        if (ramp > 0.02) {
+          const pool = (wx: number, wy: number, r: number, hole: number, col: string) =>
+            pools.push([(wx - s.camX) * S, (wy - s.camY) * S, r * S, hole, col]);
+          for (const o of vis) {
+            if (o.key === "lamp") pool(o.x, o.y - 30, 40, 1, "255,208,90");
+            else if (o.key === "campfire") pool(o.x, o.y - 8, 54, 1, "255,176,60");
+            else if (o.key === "jukebox") pool(o.x, o.y - 14, 24, 0.9, "255,204,90");
+            else if (o.key === "stall") pool(o.x, o.y - 18, 28, 0.9, "255,206,110");
+            else if (o.key === "well") pool(o.x, o.y - 12, 20, 0.7, "255,204,90");
+            else if (o.key === "home") {
+              const left = o.x - 52;
+              const top = o.y - 108;
+              pool(left + 36, top + 53, 17, 1, "255,206,96");
+              pool(left + 70, top + 53, 17, 1, "255,206,96");
+              pool(left + 52, top + 92, 28, 1, "255,190,80");
+            } else if (o.key.startsWith("house")) pool(o.x, o.y - 18, 20, 0.95, "255,200,100");
+          }
+          if (maskCv.width !== cw || maskCv.height !== chh) {
+            maskCv.width = cw;
+            maskCv.height = chh;
+          }
+          const mctx = maskCv.getContext("2d")!;
+          mctx.globalCompositeOperation = "source-over";
+          mctx.clearRect(0, 0, cw, chh);
+          mctx.fillStyle = mult;
+          mctx.fillRect(0, 0, cw, chh);
+          mctx.globalCompositeOperation = "destination-out";
+          for (const [px, py, pr, ph] of pools) {
+            const g = mctx.createRadialGradient(px, py, 0, px, py, pr);
+            g.addColorStop(0, `rgba(0,0,0,${ph * ramp})`);
+            g.addColorStop(0.6, `rgba(0,0,0,${ph * ramp * 0.75})`);
+            g.addColorStop(1, "rgba(0,0,0,0)");
+            mctx.fillStyle = g;
+            mctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+          }
+          mctx.globalCompositeOperation = "source-over";
+          ctx.globalCompositeOperation = "multiply";
+          ctx.drawImage(maskCv, 0, 0);
+          ctx.globalCompositeOperation = "source-over";
+        } else if (dim) {
+          ctx.globalCompositeOperation = "multiply";
+          ctx.fillStyle = mult;
+          ctx.fillRect(0, 0, cw, chh);
+          ctx.globalCompositeOperation = "source-over";
+        }
+        const [ar, ag, ab, aa] = light.add;
+        if (aa > 0.005) {
+          const wash = ctx.createLinearGradient(0, 0, 0, chh);
+          wash.addColorStop(0, `rgba(${Math.round(ar)},${Math.round(ag * 0.85)},${Math.min(255, Math.round(ab + 25))},${aa * 1.5})`);
+          wash.addColorStop(1, `rgba(${Math.round(ar)},${Math.round(ag)},${Math.round(ab)},${aa * 0.5})`);
+          ctx.fillStyle = wash;
+          ctx.fillRect(0, 0, cw, chh);
+        }
+        if (dark > 0.2) {
+          // richer colour and deeper shadows, like a night lit by a few warm windows
+          ctx.globalCompositeOperation = "overlay";
+          ctx.fillStyle = `rgba(30,50,255,${0.32 * dark})`;
+          ctx.fillRect(0, 0, cw, chh);
+          ctx.globalCompositeOperation = "source-over";
+        }
+        // soft shafts of light in the morning and at sunset, cloud shadows at noon
+        if (!reduceMotion) {
+          if (light.period === "morning" || light.period === "sunset") {
+            const rgb = light.period === "morning" ? "255,236,180" : "255,150,90";
+            for (let i = 0; i < 4; i++) {
+              const x0 = (i * 0.27 + 0.04 + Math.sin(t * 0.12 + i) * 0.02) * cw;
+              const a = (0.05 + 0.025 * Math.sin(t * 0.5 + i * 1.7)) * (light.period === "sunset" ? 1.5 : 1);
+              ctx.fillStyle = `rgba(${rgb},${a})`;
+              ctx.beginPath();
+              ctx.moveTo(x0, 0);
+              ctx.lineTo(x0 + 0.1 * cw, 0);
+              ctx.lineTo(x0 + 0.1 * cw + 0.35 * chh, chh);
+              ctx.lineTo(x0 + 0.35 * chh - 0.02 * cw, chh);
+              ctx.closePath();
+              ctx.fill();
+            }
+          } else if (light.period === "noon") {
+            ctx.fillStyle = "rgba(20,50,30,0.06)";
+            for (let i = 0; i < 3; i++) {
+              const cx = ((t * 9 + i * 330) % (world.w + 500)) - 250;
+              const cy = 260 + i * 520 + Math.sin(i * 3) * 80;
+              ctx.beginPath();
+              ctx.ellipse((cx - s.camX) * S, (cy - s.camY) * S, 90 * S, 36 * S, 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        // the colour of each light is laid over its pool (so a lamp looks amber,
+        // the campfire orange, the jukebox pink), with only a tiny glow on the
+        // light itself
+        if (pools.length) {
+          ctx.globalCompositeOperation = "overlay";
+          for (const [px, py, pr, , col] of pools) {
+            const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
+            g.addColorStop(0, `rgba(${col},${0.85 * ramp})`);
+            g.addColorStop(0.7, `rgba(${col},${0.35 * ramp})`);
+            g.addColorStop(1, `rgba(${col},0)`);
+            ctx.fillStyle = g;
+            ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+          }
+          ctx.globalCompositeOperation = "lighter";
+          for (const [px, py, pr, , col] of pools) {
+            const r = pr * 0.22;
+            const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+            g.addColorStop(0, `rgba(${col},${0.32 * ramp})`);
+            g.addColorStop(1, `rgba(${col},0)`);
+            ctx.fillStyle = g;
+            ctx.fillRect(px - r, py - r, r * 2, r * 2);
+          }
+          ctx.globalCompositeOperation = "source-over";
+        }
+      }
+
+      // emissive things go on after the grade: fairy lights and fireflies
+      ctx.setTransform(S, 0, 0, S, -s.camX * S, -s.camY * S);
+      // golden fairy lights along the home street: strings between the lamp
+      // posts, a row along each house eave, and a warm glow round every lamp
+      if (s.scene === "out" && s.camY < 200 && s.camY + vh > 80) {
+        const BULBS = [
+          ["#fff3a8", "255,230,130"],
+          ["#ffe27a", "255,214,100"],
+          ["#fff6c4", "255,236,150"],
+          ["#ffd96a", "255,204,90"],
+        ];
+        const bulb = (bx: number, by: number, i: number) => {
+          const on = reduceMotion || Math.sin(t * 2.6 + i * 1.3) > -0.35;
+          const night = dark > 0.35;
+          const [core, halo] = night ? BULBS[((i % 4) + 4) % 4] : BULBS[0];
+          ctx.fillStyle = on ? core : "#8a6f3a";
+          ctx.fillRect(Math.round(bx), Math.round(by), 2, 2);
+          if (on) {
+            ctx.fillStyle = `rgba(${halo},${night ? 0.45 : 0.2})`;
+            ctx.fillRect(Math.round(bx) - 1, Math.round(by) - 1, 4, 4);
+            if (night) {
+              ctx.fillStyle = `rgba(${halo},0.16)`;
+              ctx.fillRect(Math.round(bx) - 3, Math.round(by) - 3, 8, 8);
+            }
+          }
+        };
+        const string = (x0: number, x1: number, y: number, sag: number, seed: number) => {
+          const n = Math.max(2, Math.round((x1 - x0) / 6));
+          let px = x0;
+          let py = y;
+          for (let i = 0; i <= n; i++) {
+            const f = i / n;
+            const bx = x0 + (x1 - x0) * f;
+            const by = y + Math.sin(f * Math.PI) * sag;
+            ctx.fillStyle = "rgba(120,86,30,0.75)";
+            const steps = Math.max(1, Math.round(Math.abs(bx - px)));
+            for (let k = 0; k < steps; k++) {
+              ctx.fillRect(
+                Math.round(px + ((bx - px) * k) / steps),
+                Math.round(py + ((by - py) * k) / steps),
+                1,
+                1,
+              );
+            }
+            px = bx;
+            py = by;
+            if (i > 0 && i < n) bulb(bx - 1, by, i + seed);
+          }
+        };
+        const lampX = [7, 13, 19, 25, 31, 37].map((c) => c * T + 8);
+        for (let i = 0; i < lampX.length - 1; i++) string(lampX[i], lampX[i + 1], 112, 8, i * 5);
+        for (const hc of [10, 16, 28, 34]) string(hc * T - 24, hc * T + 24, 100, 4, hc);
         ctx.globalCompositeOperation = "lighter";
-        for (const o of vis) {
-          const isLamp = o.key === "lamp";
-          if (!isLamp && o.key !== "campfire") continue;
-          const gx = (o.x - s.camX) * S;
-          const gy = (o.y - (isLamp ? 30 : 8) - s.camY) * S;
-          const gr = (isLamp ? 56 : 78) * S;
-          const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-          grad.addColorStop(0, `rgba(255,205,120,${0.5 * dark})`);
-          grad.addColorStop(1, "rgba(255,205,120,0)");
-          ctx.fillStyle = grad;
-          ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+        for (const lx of lampX) {
+          const gr = 15;
+          const g = ctx.createRadialGradient(lx, 112, 0, lx, 112, gr);
+          g.addColorStop(0, `rgba(255,214,90,${0.34 - dark * 0.14})`);
+          g.addColorStop(1, "rgba(255,214,90,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(lx - gr, 112 - gr, gr * 2, gr * 2);
         }
         ctx.globalCompositeOperation = "source-over";
+      }
+
+      // fireflies over the grass (only the ones on screen); drawn after the
+      // night colour grade so they stay bright and keep their colours
+      const FLY = ["255,208,70", "255,224,100", "255,196,60"];
+      for (const f of reduceMotion ? [] : flies) {
+        if (f.x < s.camX - 12 || f.x > s.camX + vw + 12 || f.y < s.camY - 12 || f.y > s.camY + vh + 12) continue;
+        const a = Math.max(0, Math.sin(t * 1.7 + f.p * 3));
+        const glow = Math.min(1, (0.25 + 0.75 * a * a) * (0.6 + dark * 1.1));
+        const col = FLY[Math.floor(f.p * 10) % 3];
+        const fx = Math.round(f.x + Math.sin(t * 0.6 + f.p) * 9);
+        const fy = Math.round(f.y + Math.cos(t * 0.8 + f.p * 1.3) * 6 - 6);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = `rgba(${col},${(0.1 + dark * 0.12) * glow})`;
+        ctx.fillRect(fx - 3, fy - 3, 7, 7);
+        ctx.fillStyle = `rgba(${col},${(0.28 + dark * 0.3) * glow})`;
+        ctx.fillRect(fx - 1, fy - 2, 3, 5);
+        ctx.fillRect(fx - 2, fy - 1, 5, 3);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = `rgba(255,246,170,${0.5 + 0.5 * glow})`;
+        ctx.fillRect(fx - 1, fy - 1, 2, 2);
       }
 
       // ---- screen-space labels ----
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       for (const it of world.interacts) {
         if (!inView({ x: it.signX, y: it.signY })) continue;
-        const lift = it.kind === "post" ? 36 : BIG.has(it.id) ? 70 : 34;
+        // (the edit tag of a notice board sits just under it, so it never covers the words)
+        const lift = it.kind === "post" ? 36 : it.id.startsWith("board:") ? -22 : BIG.has(it.id) ? 70 : 34;
         const sx = (it.signX - s.camX) * S;
         const sy = (it.signY - lift - s.camY) * S;
         let text = it.label;
@@ -1536,7 +1853,7 @@ export function GameWorld({
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (e.ctrlKey || e.metaKey || e.altKey || g.current.open) return;
-      const k = e.key.toLowerCase();
+      const k = (e.key ?? "").toLowerCase();
       if (["arrowleft", "arrowright", "arrowup", "arrowdown", "a", "d", "w", "s", "shift"].includes(k)) {
         g.current.keys.add(k);
         if (k.startsWith("arrow")) e.preventDefault();
@@ -1557,7 +1874,7 @@ export function GameWorld({
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      g.current.keys.delete(e.key.toLowerCase());
+      g.current.keys.delete((e.key ?? "").toLowerCase());
     };
     const onBlur = () => g.current.keys.clear();
     window.addEventListener("keydown", onKeyDown);
@@ -1662,10 +1979,24 @@ export function GameWorld({
           📜 {readCount} / {stops.length} read
         </span>
         {mpOn && <span>👥 {online === 1 ? "just you" : `${online} online`}</span>}
-        {DAY_NIGHT_ENABLED && <span>{timeLabel}</span>}
         {admin && <span>👑 Fox (superadmin)</span>}
         {owner && <span>🌸 Sheza (owner)</span>}
       </div>
+
+      {DAY_NIGHT_ENABLED && !gate && (
+        <button
+          type="button"
+          className="g-time"
+          title="Jump to the next part of the day"
+          onClick={() => {
+            const s = g.current;
+            s.dayShift += nextPeriodSeconds(s.dayShift);
+            sound.play("click");
+          }}
+        >
+          {timeLabel}
+        </button>
+      )}
 
       <nav className={`g-nav${navPref ?? false ? "" : " g-nav-min"}`} aria-label="Site">
         {(navPref ?? false) && (
@@ -1721,7 +2052,7 @@ export function GameWorld({
 
       <canvas
         ref={mapRef}
-        className={`g-map${scene === "home" ? " g-map-off" : ""}${admin ? " g-map-tp" : ""}`}
+        className={`g-map${scene !== "out" ? " g-map-off" : ""}${admin ? " g-map-tp" : ""}`}
         aria-hidden="true"
         onClick={teleport}
         title={admin ? "Click to teleport" : undefined}
@@ -1773,6 +2104,40 @@ export function GameWorld({
         />
       )}
 
+      {cookIdx !== null && RECIPES[cookIdx] && (
+        <CookingGame
+          key={cookIdx}
+          recipe={RECIPES[cookIdx]}
+          onFinish={finishCooking}
+          onCancel={cancelCooking}
+          onSound={playSound}
+        />
+      )}
+
+      {libraryOpen && <Library onClose={() => closePopup(() => setLibraryOpen(false))} onSound={playSound} />}
+      {fishing && <FishingGame onClose={() => closePopup(() => setFishing(false))} onSound={playSound} />}
+      {tvOpen && (
+        <TvModal
+          channel={tvChannel}
+          onChannel={changeChannel}
+          onClose={() => closePopup(() => setTvOpen(false))}
+          onSound={playSound}
+        />
+      )}
+      {pianoOpen && <PianoModal onClose={() => closePopup(() => setPianoOpen(false))} />}
+      {editBoard && (
+        <BoardEditor
+          id={editBoard}
+          value={boards[editBoard]}
+          onSaved={(b) => {
+            setBoards((prev) => ({ ...prev, [editBoard]: b }));
+            closePopup(() => setEditBoard(null));
+            showToast("Board updated!");
+          }}
+          onClose={() => closePopup(() => setEditBoard(null))}
+        />
+      )}
+
       {gate && (
         <GateScreen
           art={assets?.art ?? null}
@@ -1821,18 +2186,9 @@ export function GameWorld({
 
       {/* Plain links so crawlers and keyboard / screen-reader users can reach
           every post without playing. */}
-      <section className="sr-only" aria-label="A note at the start of the town">
-        <p>
-          Sorry for making you feel ignored from my side. Sorry for anything I said or did that
-          didn&apos;t feel right, or felt ignorant and rude, or anything bad.
-        </p>
-      </section>
-
-      <section className="sr-only" aria-label="Kind reminders at the start of the town">
-        <p>
-          It&apos;s normal to laugh when someone trips. It&apos;s okay to notice change in yourself.
-          You are not toxic. Things take their own time and way. Believe and trust Allah.
-        </p>
+      <section className="sr-only" aria-label="Notes at the start of the town">
+        <p>{boards.sorry.lines.join(" ")}</p>
+        <p>{boards.kind.lines.join(" ")}</p>
       </section>
 
       <nav className="sr-only" aria-label="All posts">

@@ -1,0 +1,453 @@
+.g-fish {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(14, 30, 18, 0.6);
+  font-family: var(--font-pixelify), monospace;
+}
+.g-fish-card {
+  position: relative;
+  width: min(400px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 14px;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 4px solid var(--wood-dark);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 3px #f0c48c,
+    0 6px 0 rgba(0, 0, 0, 0.4);
+}
+.g-fish-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.g-fish-title {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  color: #5c3416;
+}
+.g-fish-btn {
+  min-height: 44px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 16px;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 2px #f6dfb8,
+    0 3px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.g-fish-btn:hover:not(:disabled),
+.g-fish-btn:focus-visible {
+  outline: none;
+  background: #fff3d2;
+}
+.g-fish-btn[aria-pressed="true"] {
+  background: #f6c453;
+}
+.g-fish-primary {
+  width: 100%;
+  background: #f6c453;
+  font-size: 19px;
+  min-height: 52px;
+}
+.g-fish-primary:hover:not(:disabled),
+.g-fish-primary:focus-visible {
+  background: #ffd36a;
+}
+.g-fish-x {
+  min-width: 44px;
+  padding: 6px 10px;
+}
+.g-fish-scene {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  background: linear-gradient(#9fd8f2 0 38%, #3d8fc0 38% 100%);
+  image-rendering: pixelated;
+}
+.g-fish-sun {
+  position: absolute;
+  top: 12px;
+  right: 22px;
+  width: 22px;
+  height: 22px;
+  background: #ffe27a;
+  box-shadow: 0 0 0 4px #fff0b0;
+}
+.g-fish-cloud {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  width: 44px;
+  height: 12px;
+  background: #fff;
+  box-shadow: 10px -8px 0 #fff;
+  animation: g-fish-drift 40s linear infinite;
+}
+.g-fish-water {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 38%;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    #3d8fc0 0 14px,
+    #4aa0d0 14px 16px
+  );
+  animation: g-fish-shimmer 3s steps(4) infinite;
+}
+.g-fish-wave {
+  position: absolute;
+  height: 3px;
+  width: 26px;
+  background: rgba(255, 255, 255, 0.45);
+  animation: g-fish-wave 4s linear infinite;
+}
+.g-fish-reed {
+  position: absolute;
+  bottom: 0;
+  width: 6px;
+  height: 70px;
+  background: #3f7a35;
+  box-shadow: 8px 14px 0 #4d8f40, -8px 24px 0 #356a2d;
+  transform-origin: bottom;
+  animation: g-fish-sway 3s ease-in-out infinite;
+}
+.g-fish-reed::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: -1px;
+  width: 8px;
+  height: 16px;
+  background: #7a4a22;
+}
+.g-fish-rod {
+  position: absolute;
+  left: 14px;
+  bottom: -10px;
+  width: 5px;
+  height: 120px;
+  background: #7a4a22;
+  transform-origin: bottom;
+  transform: rotate(38deg);
+  transition: transform 0.25s steps(4);
+}
+.g-fish-scene[data-phase="casting"] .g-fish-rod {
+  transform: rotate(70deg);
+}
+.g-fish-scene[data-phase="bite"] .g-fish-rod,
+.g-fish-scene[data-phase="reeling"] .g-fish-rod {
+  transform: rotate(28deg);
+}
+.g-fish-line {
+  position: absolute;
+  left: 82px;
+  top: 28px;
+  width: 2px;
+  height: 66px;
+  background: rgba(255, 255, 255, 0.8);
+  transform-origin: top;
+  transform: rotate(-52deg);
+}
+.g-fish-bobber {
+  position: absolute;
+  left: 160px;
+  top: 78px;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(#e24a3a 50%, #fff 50%);
+  border: 2px solid #3a2a18;
+  border-radius: 50%;
+  transition: transform 0.2s steps(3);
+}
+.g-fish-scene[data-phase="idle"] .g-fish-bobber,
+.g-fish-scene[data-phase="result"] .g-fish-bobber {
+  transform: translate(-60px, 40px);
+  opacity: 0;
+}
+.g-fish-scene[data-phase="casting"] .g-fish-bobber {
+  animation: g-fish-cast 0.7s ease-out;
+}
+.g-fish-scene[data-phase="waiting"] .g-fish-bobber {
+  animation: g-fish-bob 1.6s ease-in-out infinite;
+}
+.g-fish-scene[data-phase="bite"] .g-fish-bobber {
+  animation: g-fish-dip 0.25s ease-in-out infinite;
+}
+.g-fish-scene[data-phase="reeling"] .g-fish-bobber {
+  animation: g-fish-dip 0.4s ease-in-out infinite;
+}
+.g-fish-ripple {
+  position: absolute;
+  left: 150px;
+  top: 88px;
+  width: 34px;
+  height: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  opacity: 0;
+}
+.g-fish-scene[data-phase="waiting"] .g-fish-ripple {
+  animation: g-fish-ring 2.4s ease-out infinite;
+}
+.g-fish-scene[data-phase="bite"] .g-fish-ripple,
+.g-fish-scene[data-phase="reeling"] .g-fish-ripple {
+  animation: g-fish-ring 0.6s ease-out infinite;
+  border-width: 3px;
+}
+.g-fish-bang {
+  position: absolute;
+  left: 150px;
+  top: 30px;
+  font-size: 44px;
+  line-height: 1;
+  color: #e24a3a;
+  text-shadow:
+    2px 2px 0 #fff,
+    -2px -2px 0 #fff,
+    2px -2px 0 #fff,
+    -2px 2px 0 #fff;
+  animation: g-fish-pop 0.3s ease-in-out infinite;
+}
+.g-fish-status {
+  min-height: 24px;
+  margin: 8px 0;
+  text-align: center;
+  font-size: 16px;
+  color: #5c3416;
+}
+.g-fish-reel {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.g-fish-track {
+  position: relative;
+  width: 54px;
+  height: 200px;
+  background: #2f78a8;
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.g-fish-zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(246, 196, 83, 0.75);
+  border-top: 3px solid #fde39a;
+  border-bottom: 3px solid #c98f1a;
+}
+.g-fish-marker {
+  position: absolute;
+  left: 50%;
+  font-size: 24px;
+  line-height: 1;
+  transform: translate(-50%, 50%);
+}
+.g-fish-meter {
+  position: relative;
+  width: 18px;
+  height: 200px;
+  background: #fffbea;
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.g-fish-meter-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #6cbf4a;
+}
+.g-fish-hold {
+  flex: 1;
+  max-width: 180px;
+  font-size: 20px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.g-fish-hold:active {
+  background: #f6c453;
+}
+.g-fish-result {
+  text-align: center;
+  padding: 10px 6px;
+}
+.g-fish-big {
+  font-size: 60px;
+  line-height: 1.1;
+  animation: g-fish-pop 0.5s ease-out;
+}
+.g-fish-name {
+  margin: 4px 0;
+  font-size: 22px;
+  color: #5c3416;
+}
+.g-fish-new {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 14px;
+  color: #fff;
+  background: #e24a3a;
+  border-radius: 4px;
+}
+.g-fish-size {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #7a4a22;
+}
+.g-fish-joke {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #4a3826;
+}
+.g-fish-book {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.g-fish-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  text-align: center;
+  font-size: 12px;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+}
+.g-fish-cell[data-locked="true"] {
+  opacity: 0.6;
+}
+.g-fish-cell-emoji {
+  font-size: 28px;
+  line-height: 1.1;
+}
+.g-fish-cell small {
+  font-size: 11px;
+  color: #7a4a22;
+}
+.g-fish-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.g-fish-tabs .g-fish-btn {
+  flex: 1;
+  min-height: 40px;
+}
+
+@keyframes g-fish-drift {
+  from {
+    transform: translateX(-60px);
+  }
+  to {
+    transform: translateX(420px);
+  }
+}
+@keyframes g-fish-shimmer {
+  50% {
+    background-position: 0 4px;
+  }
+}
+@keyframes g-fish-wave {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  30%,
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120px);
+    opacity: 0;
+  }
+}
+@keyframes g-fish-sway {
+  50% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes g-fish-cast {
+  from {
+    transform: translate(-90px, -50px);
+  }
+  to {
+    transform: translate(0, 0);
+  }
+}
+@keyframes g-fish-bob {
+  50% {
+    transform: translateY(3px);
+  }
+}
+@keyframes g-fish-dip {
+  50% {
+    transform: translateY(7px);
+  }
+}
+@keyframes g-fish-ring {
+  from {
+    transform: scale(0.3);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@keyframes g-fish-pop {
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g-fish-cloud,
+  .g-fish-water,
+  .g-fish-wave,
+  .g-fish-reed,
+  .g-fish-bang,
+  .g-fish-big,
+  .g-fish-scene[data-phase="casting"] .g-fish-bobber,
+  .g-fish-scene[data-phase="waiting"] .g-fish-bobber,
+  .g-fish-scene[data-phase="bite"] .g-fish-bobber,
+  .g-fish-scene[data-phase="reeling"] .g-fish-bobber {
+    animation: none;
+  }
+  .g-fish-rod {
+    transition: none;
+  }
+  .g-fish-scene[data-phase="bite"] .g-fish-bobber,
+  .g-fish-scene[data-phase="reeling"] .g-fish-bobber {
+    transform: translateY(7px);
+  }
+}
