@@ -100,11 +100,11 @@ export function buildWorld(stops: Stop[], adminHouse = false, canEdit = false): 
     key: string,
     cx: number, // tile centre, may be fractional
     row: number, // tile row the base sits on
-    opts: { flat?: boolean; blockTiles?: [number, number][]; interact?: string } = {},
+    opts: { flat?: boolean; blockTiles?: [number, number][]; interact?: string; lift?: number } = {},
   ) => {
     const x = cx * T;
     const y = (row + 1) * T;
-    objects.push({ key, x, y, flat: opts.flat, interact: opts.interact });    for (const [c, r] of opts.blockTiles ?? []) block(c, r);
+    objects.push({ key, x, y, flat: opts.flat, interact: opts.interact, lift: opts.lift });    for (const [c, r] of opts.blockTiles ?? []) block(c, r);
   };
 
   // ---- the town: five houses along a street, facing a dirt square ----
@@ -200,6 +200,28 @@ export function buildWorld(stops: Stop[], adminHouse = false, canEdit = false): 
     spotY: 12 * T + 12,
   });
   for (const lc of [7, 13, 19, 25, 31, 37]) place("lamp", lc + 0.5, 8, { blockTiles: [[lc, 8]] });
+  // jars of fireflies (tap one to let them out): a helper, used here and at the ponds
+  let jarN = 0;
+  const addJar = (cx: number, row: number, lift = 0) => {
+    const id = `jar:${jarN++}`;
+    place("jar", cx, row, { lift, interact: id });
+    const x = cx * T;
+    const y = (row + 1) * T;
+    interacts.push({
+      id,
+      kind: "act",
+      act: id,
+      label: "Firefly jar",
+      verb: "Open the jar",
+      signX: x,
+      signY: y - lift - 6,
+      spotX: x,
+      spotY: y + 10,
+      hitDy: 8,
+      hitR: 14,
+    });
+  };
+
   // dressing the street: flower troughs under the house windows, barrels and
   // crates at the ends, golden topiary round the palace door, a welcome rug,
   // a market stall and a well
@@ -217,6 +239,16 @@ export function buildWorld(stops: Stop[], adminHouse = false, canEdit = false): 
   place("stall", 33, 11, { blockTiles: [[32, 11], [33, 11]] });
   place("well", 36.5, 11, { blockTiles: [[36, 11]] });
   reserve(30, 8, 39, 13);
+  addJar(9.2, 8, 13);
+  addJar(11.9, 8, 17);
+  addJar(35.6, 8, 17);
+  addJar(36.2, 9, 12);
+  addJar(25.5, 10, 9);
+  addJar(32.3, 11, 18);
+  addJar(36.5, 11, 16);
+  addJar(21.3, 14.3);
+  addJar(23.3, 10.4);
+  addJar(27.9, 11.9);
   for (const [fx, fy] of [[15, 12], [16, 13], [27, 13], [30, 9], [12, 11], [33, 11], [9, 11], [14, 11]])
     place(`flower${(fx + fy) % 4}`, fx + 0.5, fy);
 
@@ -258,8 +290,9 @@ export function buildWorld(stops: Stop[], adminHouse = false, canEdit = false): 
           }
         }
       reserve(fc - 6, fr - 4, fc + 6, fr + 4);
-      // a fishing spot on the bank nearest the trail
+      // a fishing spot on the bank nearest the trail, with a jar of fireflies by it
       const bank = pathCenter(fr) >= fc ? 1 : -1;
+      addJar(fc + bank * 5.6, fr + 1.2);
       interacts.push({
         id: `fish:${i}`,
         kind: "act",

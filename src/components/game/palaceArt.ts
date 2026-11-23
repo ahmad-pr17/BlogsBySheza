@@ -898,6 +898,116 @@ function dish(base: string, top: string, bits: string[], big = false): Cv {
   });
 }
 
+// ---------------------------------------------------------------- wardrobe
+function grandWardrobe(): Cv {
+  return mk(50, 66, (c) => {
+    ell(c, P.shadow, 25, 64, 23, 2);
+    // feet and body
+    R(c, P.out, 2, 58, 7, 7);
+    R(c, P.out, 41, 58, 7, 7);
+    R(c, P.woodD, 3, 59, 5, 5);
+    R(c, P.woodD, 42, 59, 5, 5);
+    R(c, P.out, 0, 9, 50, 51);
+    R(c, P.woodD, 1, 10, 48, 49);
+    // carved pediment with a gold crest
+    R(c, P.out, 3, 1, 44, 10);
+    R(c, P.gold, 4, 2, 42, 7);
+    R(c, P.goldL, 4, 2, 42, 2);
+    R(c, P.goldD, 4, 8, 42, 1);
+    R(c, P.out, 20, 0, 10, 5);
+    R(c, P.gold, 21, 0, 8, 4);
+    R(c, P.redL, 24, 1, 2, 2);
+    // two tall glass doors, with dresses on hangers inside
+    const dresses: [string, string][][] = [
+      [["#f08cb0", "#f9b4cf"], ["#eef3fb", "#ffffff"], ["#f6cf3f", "#fde98a"]],
+      [["#3d6fd8", "#6f9af0"], ["#8e5fd0", "#b58af0"], ["#d0384a", "#f06a78"]],
+    ];
+    [4, 27].forEach((dx, di) => {
+      R(c, P.out, dx, 14, 19, 33);
+      R(c, P.wood, dx + 1, 15, 17, 31);
+      R(c, "#2a2038", dx + 2, 16, 15, 29);
+      R(c, "#3d3050", dx + 2, 16, 15, 4);
+      R(c, P.goldD, dx + 2, 19, 15, 1); // the hanging rail
+      dresses[di].forEach(([main, light], k) => {
+        const x = dx + 3 + k * 5;
+        R(c, P.goldL, x + 1, 19, 1, 2);
+        R(c, main, x, 21, 4, 3); // bodice
+        R(c, light, x, 21, 1, 3);
+        for (let r = 0; r < 12; r++) {
+          const w = 4 + Math.floor(r / 3);
+          R(c, main, x - Math.floor((w - 4) / 2), 24 + r, w, 1);
+          if (r % 4 === 1) R(c, light, x - Math.floor((w - 4) / 2), 24 + r, 1, 1);
+        }
+        R(c, "#ffffff", x + 1, 26 + k * 2, 1, 1);
+        R(c, "#ffffff", x + 3, 31 + k, 1, 1);
+      });
+      // the glass shine
+      R(c, "rgba(255,255,255,0.22)", dx + 3, 17, 2, 26);
+      R(c, P.goldL, dx + (di === 0 ? 16 : 1), 30, 2, 5); // handle
+    });
+    R(c, P.out, 24, 14, 2, 33);
+    // drawers below, with gold pulls
+    R(c, P.wood, 3, 49, 44, 9);
+    R(c, P.woodHi, 3, 49, 44, 1);
+    R(c, P.woodD, 24, 50, 1, 8);
+    R(c, P.goldL, 10, 53, 5, 2);
+    R(c, P.goldL, 35, 53, 5, 2);
+  });
+}
+
+// -------------------------------------------------------------- ballroom
+function harp(): Cv {
+  return mk(26, 44, (c) => {
+    ell(c, P.shadow, 13, 42, 11, 2);
+    // curved gold frame, pillar and soundbox
+    R(c, P.out, 3, 4, 20, 36);
+    R(c, P.out, 18, 2, 6, 38);
+    R(c, P.gold, 19, 3, 4, 36);
+    R(c, P.goldL, 19, 3, 1, 36);
+    R(c, P.out, 3, 4, 17, 5);
+    R(c, P.gold, 4, 5, 16, 3);
+    R(c, P.goldL, 4, 5, 16, 1);
+    R(c, P.out, 2, 30, 9, 11);
+    R(c, P.goldD, 3, 31, 7, 9);
+    R(c, P.gold, 3, 31, 7, 2);
+    // strings
+    for (let i = 0; i < 7; i++) {
+      R(c, i % 2 ? P.paper : P.goldL, 5 + i * 2, 9, 1, 29 - i * 2);
+    }
+    R(c, P.red, 11, 38, 6, 2);
+  });
+}
+
+function stagePlatform(): Cv {
+  return mk(96, 36, (c) => {
+    R(c, P.out, 0, 2, 96, 34);
+    R(c, "#8a4a3a", 1, 3, 94, 24);
+    R(c, "#a9604a", 1, 3, 94, 3);
+    for (let x = 4; x < 94; x += 12) R(c, "#7a3f31", x, 6, 1, 20);
+    R(c, P.redD, 1, 27, 94, 8);
+    R(c, P.red, 1, 27, 94, 3);
+    R(c, P.gold, 1, 27, 94, 1);
+    for (let x = 3; x < 94; x += 8) R(c, P.goldD, x, 31, 3, 2);
+  });
+}
+
+// A glass jar with a cork lid. The fireflies inside are drawn live.
+function jar(): Cv {
+  return mk(14, 18, (c) => {
+    ell(c, P.shadow, 7, 17, 5, 1);
+    R(c, P.out, 4, 0, 6, 2);
+    R(c, P.woodL, 4, 1, 6, 2);
+    R(c, P.out, 3, 3, 8, 2);
+    R(c, P.woodD, 4, 3, 6, 1);
+    R(c, P.out, 2, 5, 10, 11);
+    R(c, "#a9d4e8", 3, 6, 8, 9);
+    R(c, "#cfe9f5", 3, 6, 8, 2);
+    R(c, "#ffffff", 4, 7, 1, 7);
+    R(c, "#7fb0cc", 3, 14, 8, 1);
+    R(c, P.out, 3, 15, 8, 1);
+  });
+}
+
 // ------------------------------------------------------------ street decor
 function planter(): Cv {
   return mk(28, 18, (c) => {
@@ -1068,6 +1178,10 @@ export function palaceProps(): Record<string, Cv | Cv[]> {
     globe: globe(),
     diningTable: diningTable(),
     planter: planter(),
+    harp: harp(),
+    grandWardrobe: grandWardrobe(),
+    f_stage: stagePlatform(),
+    jar: jar(),
     barrel: barrel(),
     crate: crate(),
     stall: stall(),

@@ -35,6 +35,8 @@ import { FishingGame } from "@/components/game/FishingGame";
 import { Library } from "@/components/game/Library";
 import { PianoModal } from "@/components/game/PianoModal";
 import { TvModal } from "@/components/game/TvModal";
+import { Wardrobe } from "@/components/game/Wardrobe";
+import { DEFAULT_STYLE, drawFlowerCrown, drawHairExtras, drawOutfit, hairSheet, headAnchor, loadStyle, OUTFITS, saveStyle, type Style } from "@/components/game/style";
 import {
   cleanBoard,
   isBoardId,
@@ -164,6 +166,7 @@ export function GameWorld({
       living: buildRoom("living", homeStage),
       bedroom: buildRoom("bedroom", homeStage),
       study: buildRoom("study", homeStage),
+      ballroom: buildRoom("ballroom", homeStage),
     }),
     [homeStage],
   );
@@ -197,6 +200,8 @@ export function GameWorld({
   const [tvOpen, setTvOpen] = useState(false);
   const [tvChannel, setTvChannel] = useState(1);
   const [pianoOpen, setPianoOpen] = useState(false);
+  const [wardrobe, setWardrobe] = useState<{ tab: "dress" | "hair"; tint: number } | null>(null);
+  const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [chatText, setChatText] = useState("");
@@ -257,6 +262,9 @@ export function GameWorld({
     cooked: 0, // mirror of the cooked state, for the frame loop
     dish: null as string | null,
     tv: 1, // the channel the living-room TV shows
+    style: DEFAULT_STYLE as Style, // Sheza's dress and hair
+    swarm: [] as { x: number; y: number; vx: number; vy: number; p: number; born: number; life: number }[], // fireflies let out of jars
+    jars: {} as Record<string, number>, // jar id -> when it is full again (ms)
     knightTalk: 0,
     globeSpins: 0,
     dishName: "",
@@ -302,6 +310,9 @@ export function GameWorld({
       const n = Number(JSON.parse(localStorage.getItem(HOME_KEY) ?? "{}").cooked) || 0;
       g.current.cooked = n;
       setCooked(n);
+      const st = loadStyle();
+      g.current.style = st;
+      setStyle(st);
     } catch {
       /* ignore */
     }
@@ -430,6 +441,10 @@ export function GameWorld({
   // An emoji bubble ("😂") or a body action ("!dance").
   const sendEmote = useCallback((k: string) => {
     if (!k) return;
+    if (k === "!princess" && !(g.current.owner || g.current.admin)) {
+      showToast("👸 The princess dance is Sheza's.");
+      return;
+    }
     if (k.startsWith("!")) {
       if (!ACTION_SECONDS[k]) return;
       g.current.myAct = { k, at: performance.now() };
@@ -437,8 +452,8 @@ export function GameWorld({
       g.current.myEmote = { k, at: performance.now() };
     }
     mpRef.current?.emote(k);
-    sound.play("pop");
-  }, []);
+    sound.play(k === "!princess" || k === "!waltz" ? "chime" : "pop");
+  }, [showToast]);
 
   // The players list: refresh while it is open.
   useEffect(() => {
@@ -699,6 +714,35 @@ export function GameWorld({
         sound.play("pop");
         return;
       }
+      if (what.startsWith("jar:")) {
+        const it = world.interacts.find((i) => i.act === what);
+        if (!it) return;
+        const now = performance.now();
+        if ((s.jars[what] ?? 0) > now) {
+          showToast("The jar is empty. The fireflies will come back soon.");
+          return;
+        }
+        s.jars[what] = now + 100000;
+        const born = now / 1000;
+        const n = 11 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < n; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const sp = 8 + Math.random() * 20;
+          s.swarm.push({
+            x: it.signX + Math.cos(a) * 2,
+            y: it.signY - 2 + Math.sin(a) * 2,
+            vx: Math.cos(a) * sp,
+            vy: Math.sin(a) * sp - 12,
+            p: Math.random() * Math.PI * 2,
+            born,
+            life: 22 + Math.random() * 12,
+          });
+        }
+        if (s.swarm.length > 130) s.swarm.splice(0, s.swarm.length - 130);
+        sound.play("chime");
+        showToast("✨ A cloud of fireflies floats out!");
+        return;
+      }
       if (what.startsWith("board:")) {
         const id = what.slice(6);
         if (isBoardId(id)) openPopup(() => setEditBoard(id));
@@ -749,11 +793,24 @@ export function GameWorld({
         case "piano":
           openPopup(() => setPianoOpen(true));
           break;
+        case "wardrobe":
         case "mirror":
-          s.myEmote = { k: "✨", at: performance.now() };
-          mpRef.current?.emote("✨");
-          sound.play("chime");
-          showToast("✨ You look lovely today.");
+          if (!s.owner) {
+            if (what === "wardrobe") {
+              showToast("👗 This is Sheza's wardrobe.");
+            } else {
+              s.myEmote = { k: "✨", at: performance.now() };
+              mpRef.current?.emote("✨");
+              sound.play("chime");
+              showToast("✨ You look lovely today.");
+            }
+          } else if (s.me.kind !== "farmer") {
+            showToast("👗 Dresses fit the farmer best. Pick the farmer at the entry screen.");
+          } else {
+            const tint = s.me.tint;
+            sound.play("chime");
+            openPopup(() => setWardrobe({ tab: what === "mirror" ? "hair" : "dress", tint }));
+          }
           break;
         case "globe": {
           const facts = [
@@ -767,12 +824,26 @@ export function GameWorld({
           sound.play("page");
           break;
         }
+        case "dance": {
+          // the waltz floor: Sheza dances the princess dance, everyone else waltzes
+          const k = s.owner || s.admin ? "!princess" : "!waltz";
+          s.target = null;
+          s.myAct = { k, at: performance.now() };
+          mpRef.current?.emote(k);
+          sound.waltz(k === "!princess" ? 23 : 14);
+          showToast(k === "!princess" ? "👸 A princess dance!" : "🎶 A waltz for you!");
+          break;
+        }
+        case "harp":
+          [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => window.setTimeout(() => sound.note(f), i * 110));
+          showToast("🎶 You pluck the harp.");
+          break;
         case "fish":
           openPopup(() => setFishing(true));
           break;
       }
     },
-    [fadeTo, switchScene, showToast, openPopup],
+    [fadeTo, switchScene, showToast, openPopup, world],
   );
 
   const activate = useCallback(
@@ -865,7 +936,7 @@ export function GameWorld({
             art,
             ground: buildGround(world, art),
             roomBgs: Object.fromEntries(
-              (["home", "kitchen", "living", "bedroom", "study"] as RoomId[]).map((id) => [id, buildRoomBg(id, art)]),
+              (["home", "kitchen", "living", "bedroom", "study", "ballroom"] as RoomId[]).map((id) => [id, buildRoomBg(id, art)]),
             ) as Record<RoomId, HTMLCanvasElement>,
           });
       })
@@ -976,6 +1047,7 @@ export function GameWorld({
         mctx.fillRect(Math.round(x * kx - d / 2), Math.round(y * ky - d / 2), d, d);
       };
       for (const it of world.interacts) {
+        if (it.id.startsWith("jar:")) continue;
         const col =
           it.kind === "post"
             ? s.read.has(it.id)
@@ -1024,6 +1096,41 @@ export function GameWorld({
       ctx.fillText(t, x + 6 * u, y + h / 2 + 1);
     };
 
+    // Birds: they perch on roofs, lamps and benches, and flit away when you walk up.
+    type Bird = {
+      x: number; y: number; z: number;
+      fx: number; fy: number; fz: number;
+      tx: number; ty: number; tz: number;
+      flying: boolean; t: number; dur: number; wait: number; col: number; face: number;
+    };
+    const perches: [number, number, number][] = [];
+    for (const o of world.objects) {
+      if (o.key.startsWith("house")) perches.push([o.x - 13, o.y, 46], [o.x + 13, o.y, 46]);
+      else if (o.key === "home") perches.push([o.x - 15, o.y, 78], [o.x + 15, o.y, 78]);
+      else if (o.key === "lamp") perches.push([o.x, o.y, 37]);
+      else if (o.key === "bench") perches.push([o.x - 6, o.y, 9], [o.x + 6, o.y, 9]);
+      else if (o.key === "fencePost") perches.push([o.x, o.y, 13]);
+      else if (o.key === "sign0") perches.push([o.x, o.y, 26]);
+    }
+    const birds: Bird[] = [];
+    {
+      const rnd = mulberry32(0xb1d5);
+      const here = perches.filter((p) => Math.hypot(p[0] - 352, p[1] - 180) < 900);
+      for (let i = 0; i < 18 && here.length; i++) {
+        const p = here[Math.floor(rnd() * here.length)];
+        birds.push({
+          x: p[0], y: p[1], z: p[2], fx: p[0], fy: p[1], fz: p[2], tx: p[0], ty: p[1], tz: p[2],
+          flying: false, t: 0, dur: 1, wait: 1 + rnd() * 7, col: Math.floor(rnd() * 5), face: rnd() < 0.5 ? 1 : -1,
+        });
+      }
+    }
+    const BIRD_COL = [
+      ["#5d8fd8", "#f3f0e0"],
+      ["#d0463b", "#f2b8a8"],
+      ["#f2c94c", "#fff1a8"],
+      ["#8a6a4a", "#dcc9a4"],
+      ["#5fa88a", "#e6f2e0"],
+    ];
     const maskCv = document.createElement("canvas"); // the night, with holes where the lights are
     let raf = 0;
     let stepAcc = 0; // time since the last footstep sound
@@ -1191,6 +1298,59 @@ export function GameWorld({
         }
       }
 
+      // ---- birds, and the fireflies let out of jars ----
+      if (s.scene === "out" && !reduceMotion) {
+        for (const b of birds) {
+          if (b.flying) {
+            b.t += dt;
+            const f = Math.min(1, b.t / b.dur);
+            const e = f * f * (3 - 2 * f);
+            b.x = b.fx + (b.tx - b.fx) * e;
+            b.y = b.fy + (b.ty - b.fy) * e;
+            b.z = b.fz + (b.tz - b.fz) * e + Math.sin(f * Math.PI) * 16;
+            if (f >= 1) {
+              b.flying = false;
+              b.wait = 3 + Math.random() * 7;
+            }
+          } else {
+            b.wait -= dt;
+            const near = Math.hypot(b.x - s.x, b.y - s.y) < 46;
+            if (near || b.wait <= 0) {
+              const cands = perches.filter((p) => {
+                const dd = Math.hypot(p[0] - b.x, p[1] - b.y);
+                return dd > 40 && dd < 260 && Math.hypot(p[0] - s.x, p[1] - s.y) > 60;
+              });
+              if (cands.length) {
+                const p = cands[Math.floor(Math.random() * cands.length)];
+                b.fx = b.x;
+                b.fy = b.y;
+                b.fz = b.z;
+                b.tx = p[0];
+                b.ty = p[1];
+                b.tz = p[2];
+                b.flying = true;
+                b.t = 0;
+                b.dur = 0.8 + Math.hypot(p[0] - b.x, p[1] - b.y) / 170;
+                b.face = p[0] >= b.x ? 1 : -1;
+                if (near && dark < 0.5) sound.play("wing");
+                else if (dark < 0.4 && Math.random() < 0.25) sound.play("bird");
+              } else b.wait = 2 + Math.random() * 4;
+            }
+          }
+        }
+      }
+      for (let i = s.swarm.length - 1; i >= 0; i--) {
+        const f = s.swarm[i];
+        if (t - f.born > f.life) {
+          s.swarm.splice(i, 1);
+          continue;
+        }
+        f.vx *= 1 - 0.5 * dt;
+        f.vy *= 1 - 0.5 * dt;
+        f.x += (f.vx + Math.sin(t * 1.3 + f.p * 7) * 7) * dt;
+        f.y += (f.vy + Math.cos(t * 1.1 + f.p * 5) * 5 - 2) * dt;
+      }
+
       // ---- other visitors ----
       const mp = mpRef.current;
       if (mp) {
@@ -1203,6 +1363,9 @@ export function GameWorld({
           moving: s.moving,
           fly: s.fly,
           scene: s.scene,
+          outfit: s.owner ? s.style.outfit : 0,
+          hairStyle: s.owner ? s.style.hairStyle : 0,
+          hairColor: s.owner ? s.style.hairColor : 0,
         });
       }
 
@@ -1238,13 +1401,18 @@ export function GameWorld({
         isOwner: boolean,
         action = "",
         actAge = 0,
+        look: Style | null = null,
       ) => {
-        const px = Math.round(x);
+        let px = Math.round(x);
         const py = Math.round(y);
         // body actions change the facing, the step frame and the height
         let faceDir = dir;
         let row = moving ? [0, 1, 2, 1][Math.floor(walkT * 7) % 4] : 1;
         let hop = 0;
+        let gown = false;
+        let phase = -1; // which part of the princess dance
+        let glide = 0; // sideways travel, in pixels
+        let flare = 6; // how wide the gown flares
         if (action === "!dance") {
           faceDir = [4, 5, 4, 3][Math.floor(actAge * 4) % 4];
           row = [0, 2][Math.floor(actAge * 8) % 2];
@@ -1255,7 +1423,55 @@ export function GameWorld({
         } else if (action === "!spin") {
           faceDir = [4, 5, 6, 7, 0, 1, 2, 3][Math.floor(actAge * 14) % 8];
           row = 1;
+        } else if (action === "!waltz") {
+          // a slow turn with a gentle step, like a waltz
+          faceDir = [4, 5, 6, 7, 0, 1, 2, 3][Math.floor(actAge * 2.4) % 8];
+          row = [0, 1, 2, 1][Math.floor(actAge * 4.5) % 4];
+          hop = Math.abs(Math.sin(actAge * 3)) * 1.6;
+        } else if (action === "!princess") {
+          // A proper little ballet in five parts (14 seconds): a curtsy, a waltz
+          // glide, pirouettes with the arms raised, two grand leaps, a final bow.
+          gown = true;
+          const a = actAge;
+          if (a < 1.6) {
+            phase = 0;
+            faceDir = 4;
+            row = 1;
+            hop = -2.6 * Math.sin((a / 1.6) * Math.PI);
+            flare = 6 + Math.sin((a / 1.6) * Math.PI) * 3;
+          } else if (a < 5.6) {
+            phase = 1;
+            const u = a - 1.6;
+            glide = Math.sin(u * 2.4) * 7;
+            faceDir = Math.cos(u * 2.4) > 0 ? 2 : 6;
+            row = [0, 1, 2, 1][Math.floor(u * 5) % 4];
+            hop = 1 + Math.abs(Math.sin(u * 2.4)) * 2;
+            flare = 6 + Math.abs(Math.sin(u * 2.4)) * 3;
+          } else if (a < 10) {
+            phase = 2;
+            const u = a - 5.6;
+            faceDir = [4, 5, 6, 7, 0, 1, 2, 3][Math.floor(u * 1.9 * 8) % 8];
+            row = [0, 1, 2, 1][Math.floor(u * 6) % 4];
+            hop = 2 + Math.sin(u * 3) * 1.5;
+            flare = 7 + Math.abs(Math.sin(u * 5)) * 5;
+          } else if (a < 12.2) {
+            phase = 3;
+            const f = (a - 10) / 2.2;
+            faceDir = f < 0.5 ? 2 : 6;
+            row = 1;
+            hop = Math.abs(Math.sin(f * Math.PI * 2)) * 10;
+            glide = (f < 0.5 ? -1 : 1) * Math.cos(f * Math.PI * 2) * 5;
+            flare = 12;
+          } else {
+            phase = 4;
+            const f = Math.min(1, (a - 12.2) / 1.8);
+            faceDir = 4;
+            row = 1;
+            hop = -2.6 * Math.sin(Math.min(1, f * 1.6) * Math.PI);
+            flare = 6 + Math.sin(Math.min(1, f * 1.6) * Math.PI) * 3;
+          }
         }
+        px += Math.round(glide);
         const lift = Math.round(flyLift(fly) + hop);
         const head = py - 30 + HEAD_TOP[kind] - lift; // y of the top of the head
         ctx.fillStyle = fly ? "rgba(53,55,56,0.2)" : "rgba(53,55,56,0.28)";
@@ -1270,8 +1486,9 @@ export function GameWorld({
           ctx.fillRect(px - 7 - fw, head + 13, fw - 1, 1);
           ctx.fillRect(px + 7, head + 13, fw - 1, 1);
         }
+        const sheetBase = art.chars[kind]?.[tint] ?? art.chars[kind]?.[0] ?? art.char;
         ctx.drawImage(
-          art.chars[kind]?.[tint] ?? art.chars[kind]?.[0] ?? art.char,
+          look && kind === "farmer" ? hairSheet(sheetBase, look.hairColor) : sheetBase,
           faceDir * 16,
           row * 32,
           16,
@@ -1281,16 +1498,96 @@ export function GameWorld({
           16,
           32,
         );
-        if (isOwner) {
+        if (kind === "farmer") {
+          const worn = look ? OUTFITS[look.outfit] : undefined;
+          if (gown) {
+            // the princess dance keeps the dress she is wearing (the rose gown if she has none on)
+            drawOutfit(ctx, look && look.outfit > 0 && worn ? worn : OUTFITS[1], px, py - lift, faceDir, row, actAge, false, Math.round(flare));
+          } else if (look && look.outfit > 0 && worn) {
+            drawOutfit(ctx, worn, px, py - lift, faceDir, row, t, moving);
+          }
+          if (look) drawHairExtras(ctx, px, py - lift, faceDir, row, look.hairStyle, look.hairColor, t, moving);
+        }
+        if (gown) {
+          const base = py - lift;
+          const fl = Math.round(flare);
+          // a golden spotlight on the floor
+          ctx.globalCompositeOperation = "lighter";
+          const sp = ctx.createRadialGradient(px, py - 1, 0, px, py - 1, 24);
+          sp.addColorStop(0, "rgba(255,226,140,0.32)");
+          sp.addColorStop(1, "rgba(255,226,140,0)");
+          ctx.fillStyle = sp;
+          ctx.fillRect(px - 24, py - 14, 48, 26);
+          ctx.globalCompositeOperation = "source-over";
+          // the arms: holding the skirt, out for the waltz, raised for the pirouettes, wide for the leaps
+          const mode = phase === 2 ? "up" : phase === 3 || phase === 1 ? "out" : "skirt";
+          for (const side of [-1, 1]) {
+            const sx = px + side * 4;
+            const sy = base - 8;
+            const ex = mode === "up" ? px + side * 3 : mode === "out" ? px + side * (phase === 3 ? 12 : 10) : px + side * (fl - 1);
+            const ey = mode === "up" ? head - 3 : mode === "out" ? base - (phase === 3 ? 13 : 10) : base - 3;
+            const n = Math.max(Math.abs(ex - sx), Math.abs(ey - sy), 1);
+            ctx.fillStyle = "#f08cb0";
+            for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(sx + ((ex - sx) * k) / n), Math.round(sy + ((ey - sy) * k) / n), 1, 1);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(ex - 1, ey - 1, 2, 2);
+          }
+          // the tiara, resting on the hair
+          const tia = kind === "farmer" ? headAnchor(px, py - lift, faceDir, row) : { x: px, y: head - 2 };
+          ctx.fillStyle = "#f6c453";
+          ctx.fillRect(tia.x - 3, tia.y + 1, 7, 1);
+          ctx.fillRect(tia.x - 3, tia.y, 1, 1);
+          ctx.fillRect(tia.x, tia.y - 1, 1, 2);
+          ctx.fillRect(tia.x + 3, tia.y, 1, 1);
+          ctx.fillStyle = "#ff6fa5";
+          ctx.fillRect(tia.x, tia.y - 2, 1, 1);
+          // sparkles circling her (wider and faster during the pirouettes and leaps)
+          const orbit = phase === 2 || phase === 3 ? 1.6 : 1;
+          for (let i = 0; i < 10; i++) {
+            const a = actAge * 2.2 * orbit + (i / 10) * Math.PI * 2;
+            const sx = Math.round(px + Math.cos(a) * ((13 + Math.sin(actAge * 3 + i) * 2) * orbit));
+            const sy = Math.round(base - 14 + Math.sin(a) * 9 * orbit);
+            const tw = Math.sin(actAge * 9 + i * 2) > 0;
+            ctx.fillStyle = i % 2 ? "rgba(255,224,120,0.95)" : "rgba(255,170,205,0.95)";
+            ctx.fillRect(sx, sy, tw ? 2 : 1, tw ? 2 : 1);
+          }
+          // rose petals drifting down all through the dance
+          for (let i = 0; i < 12; i++) {
+            const pp = (actAge * 0.45 + i * 0.37) % 1;
+            const sx = Math.round(px + Math.sin(actAge * 1.6 + i * 2.1) * 17);
+            const sy = Math.round(head - 8 + pp * 38);
+            ctx.fillStyle = i % 3 ? `rgba(255,150,185,${1 - pp * 0.6})` : `rgba(255,240,245,${1 - pp * 0.6})`;
+            ctx.fillRect(sx, sy, 2, 1);
+            ctx.fillRect(sx + (i % 2), sy + 1, 1, 1);
+          }
+          // hearts float up, and burst at the final bow
+          const hearts = phase === 4 ? 5 : 2;
+          for (let i = 0; i < hearts; i++) {
+            const ha = (actAge * (phase === 4 ? 1.6 : 0.9) + i * (1 / hearts)) % 1;
+            const hx = Math.round(px + (i - (hearts - 1) / 2) * 7 + Math.sin(actAge * 2 + i) * 2);
+            const hy = Math.round(head - 4 - ha * 20);
+            ctx.fillStyle = `rgba(255,105,150,${1 - ha})`;
+            ctx.fillRect(hx, hy, 2, 1);
+            ctx.fillRect(hx + 3, hy, 2, 1);
+            ctx.fillRect(hx, hy + 1, 5, 1);
+            ctx.fillRect(hx + 1, hy + 2, 3, 1);
+            ctx.fillRect(hx + 2, hy + 3, 1, 1);
+          }
+        }
+        if (isOwner && !gown) {
           // Sheza wears a little flower crown
-          const crown = ["#f29ab6", "#f6c453", "#f29ab6", "#f6c453", "#f29ab6"];
-          crown.forEach((col, i) => {
-            ctx.fillStyle = col;
-            ctx.fillRect(px - 5 + i * 2, head - 1, 2, 2);
-          });
-          ctx.fillStyle = "#78a158";
-          ctx.fillRect(px - 6, head, 1, 1);
-          ctx.fillRect(px + 5, head, 1, 1);
+          if (kind === "farmer") {
+            drawFlowerCrown(ctx, px, py - lift, faceDir, row);
+          } else {
+            const crown = ["#f29ab6", "#f6c453", "#f29ab6", "#f6c453", "#f29ab6"];
+            crown.forEach((col, i) => {
+              ctx.fillStyle = col;
+              ctx.fillRect(px - 5 + i * 2, head - 1, 2, 2);
+            });
+            ctx.fillStyle = "#78a158";
+            ctx.fillRect(px - 6, head, 1, 1);
+            ctx.fillRect(px + 5, head, 1, 1);
+          }
         }
         if (isSuper) {
           ctx.fillStyle = "#f6c453";
@@ -1336,6 +1633,7 @@ export function GameWorld({
               s.owner,
               live ? s.myAct.k : "",
               ageMs / 1000,
+              s.owner && myKind === "farmer" ? s.style : null,
             );
           },
         });
@@ -1358,6 +1656,9 @@ export function GameWorld({
               r.owner,
               r.act && Date.now() - r.actAt < (ACTION_SECONDS[r.act] ?? 0) * 1000 ? r.act : "",
               (Date.now() - r.actAt) / 1000,
+              r.owner && !r.admin && (isKind(r.kind) ? r.kind : "farmer") === "farmer"
+                ? { outfit: r.outfit, hairStyle: r.hairStyle, hairColor: r.hairColor }
+                : null,
             ),
         });
       }
@@ -1597,6 +1898,42 @@ export function GameWorld({
       }
       while (ai < actors.length) actors[ai++].draw();
 
+      // birds (asleep at night)
+      if (s.scene === "out" && dark < 0.6) {
+        for (const b of birds) {
+          if (!inView({ x: b.x, y: b.y })) continue;
+          const [c1, c2] = BIRD_COL[b.col];
+          const bx = Math.round(b.x);
+          const by = Math.round(b.y - b.z);
+          const fc = b.face;
+          if (b.flying) {
+            ctx.fillStyle = "rgba(0,0,0,0.18)";
+            ctx.fillRect(bx - 2, Math.round(b.y) - 1, 4, 1);
+          }
+          ctx.fillStyle = "#3a2a22";
+          ctx.fillRect(bx - fc * 4, by - 2, 2, 1); // tail
+          ctx.fillStyle = c1;
+          ctx.fillRect(bx - 2, by - 3, 5, 3); // body
+          ctx.fillRect(bx + (fc > 0 ? 2 : -3), by - 5, 2, 2); // head
+          ctx.fillStyle = c2;
+          ctx.fillRect(bx - 1, by - 1, 3, 1); // belly
+          ctx.fillStyle = "#f09a3a";
+          ctx.fillRect(bx + (fc > 0 ? 4 : -4), by - 4, 1, 1); // beak
+          ctx.fillStyle = "#1b1b24";
+          ctx.fillRect(bx + (fc > 0 ? 3 : -3), by - 5, 1, 1); // eye
+          ctx.fillStyle = c1;
+          if (b.flying) {
+            const up = Math.floor(t * 16 + b.x) % 2;
+            ctx.fillRect(bx - 1, by - 4 - (up ? 2 : 0), 3, 2 + (up ? 0 : 0));
+            ctx.fillStyle = c2;
+            ctx.fillRect(bx, by - 5 - (up ? 2 : -1), 2, 1);
+          } else {
+            ctx.fillStyle = "rgba(0,0,0,0.25)";
+            ctx.fillRect(bx - 1, by - 3, 2, 2);
+          }
+        }
+      }
+
       // "!" over unread posts
       const bob = Math.round(Math.sin(t * 4) * 1.5);
       for (const it of world.interacts) {
@@ -1625,6 +1962,8 @@ export function GameWorld({
             else if (o.key === "jukebox") pool(o.x, o.y - 14, 24, 0.9, "255,204,90");
             else if (o.key === "stall") pool(o.x, o.y - 18, 28, 0.9, "255,206,110");
             else if (o.key === "well") pool(o.x, o.y - 12, 20, 0.7, "255,204,90");
+            else if (o.key === "jar" && (s.jars[o.interact ?? ""] ?? 0) < performance.now())
+              pool(o.x, o.y - (o.lift ?? 0) - 7, 16, 1, "255,214,100");
             else if (o.key === "home") {
               const left = o.x - 52;
               const top = o.y - 108;
@@ -1814,9 +2153,51 @@ export function GameWorld({
         ctx.fillRect(fx - 1, fy - 1, 2, 2);
       }
 
+      // jars of fireflies and the fireflies let out of them
+      if (s.scene === "out") {
+        const nowMs = performance.now();
+        ctx.globalCompositeOperation = "lighter";
+        for (const o of vis) {
+          if (o.key !== "jar" || (s.jars[o.interact ?? ""] ?? 0) > nowMs) continue;
+          const jx = Math.round(o.x);
+          const jy = Math.round(o.y - (o.lift ?? 0));
+          const g = ctx.createRadialGradient(jx, jy - 8, 0, jx, jy - 8, 11);
+          g.addColorStop(0, `rgba(255,214,100,${0.16 + dark * 0.2})`);
+          g.addColorStop(1, "rgba(255,214,100,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(jx - 11, jy - 19, 22, 22);
+          for (let i = 0; i < 5; i++) {
+            const on = reduceMotion || Math.sin(t * 2.2 + i * 1.9 + o.x) > -0.5;
+            const dx = Math.round(Math.sin(t * 0.8 + i * 2 + o.x) * 2 + (i - 2) * 0.8);
+            const dy = Math.round(-8 + Math.cos(t * 0.7 + i * 1.7) * 2.5);
+            ctx.fillStyle = on ? "rgba(255,236,120,1)" : "rgba(255,200,80,0.35)";
+            ctx.fillRect(jx + dx, jy + dy, 2, 2);
+            if (on) {
+              ctx.fillStyle = "rgba(255,210,90,0.35)";
+              ctx.fillRect(jx + dx - 1, jy + dy - 1, 3, 3);
+            }
+          }
+        }
+        for (const f of s.swarm) {
+          const age = t - f.born;
+          const a = Math.max(0, Math.min(1, (f.life - age) / 4, age / 0.4 + 0.2)) * (0.55 + 0.45 * Math.sin(t * 3 + f.p * 5));
+          const fx = Math.round(f.x);
+          const fy = Math.round(f.y);
+          ctx.fillStyle = `rgba(255,206,70,${(0.16 + dark * 0.14) * a})`;
+          ctx.fillRect(fx - 3, fy - 3, 7, 7);
+          ctx.fillStyle = `rgba(255,224,100,${(0.4 + dark * 0.3) * a})`;
+          ctx.fillRect(fx - 1, fy - 2, 3, 5);
+          ctx.fillRect(fx - 2, fy - 1, 5, 3);
+          ctx.fillStyle = `rgba(255,250,200,${0.9 * a})`;
+          ctx.fillRect(fx - 1, fy - 1, 2, 2);
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
+
       // ---- screen-space labels ----
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       for (const it of world.interacts) {
+        if (it.id.startsWith("jar:") && it.id !== s.near) continue;
         if (!inView({ x: it.signX, y: it.signY })) continue;
         // (the edit tag of a notice board sits just under it, so it never covers the words)
         const lift = it.kind === "post" ? 36 : it.id.startsWith("board:") ? -22 : BIG.has(it.id) ? 70 : 34;
@@ -1864,9 +2245,9 @@ export function GameWorld({
       } else if (k === "t") {
         e.preventDefault();
         act.current.chat();
-      } else if (["1", "2", "3", "4", "5", "6", "7"].includes(k)) {
+      } else if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(k)) {
         const n = Number(k) - 1;
-        act.current.emote(n < 4 ? QUICK[n] : ACTIONS[n - 4].k);
+        act.current.emote(n < 4 ? QUICK[n] : (ACTIONS[n - 4]?.k ?? ""));
       } else if ((k === "enter" || k === "e" || k === " ") && g.current.near) {
         if (t?.tagName === "BUTTON" || t?.tagName === "A") return;
         e.preventDefault();
@@ -2122,6 +2503,20 @@ export function GameWorld({
           onChannel={changeChannel}
           onClose={() => closePopup(() => setTvOpen(false))}
           onSound={playSound}
+        />
+      )}
+      {wardrobe && assets && (
+        <Wardrobe
+          art={assets.art}
+          tint={wardrobe.tint}
+          value={style}
+          startTab={wardrobe.tab}
+          onChange={(st) => {
+            g.current.style = st;
+            setStyle(st);
+            saveStyle(st);
+          }}
+          onClose={() => closePopup(() => setWardrobe(null))}
         />
       )}
       {pianoOpen && <PianoModal onClose={() => closePopup(() => setPianoOpen(false))} />}

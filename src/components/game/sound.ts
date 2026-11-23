@@ -17,7 +17,8 @@ export type SoundName =
   | "splash"
   | "page"
   | "fanfare"
-  | "cricket";
+  | "cricket"
+  | "wing";
 
 const KEY = "trail-sound";
 
@@ -153,6 +154,9 @@ function createSound() {
       case "fanfare":
         [392, 392, 523, 659, 784].forEach((f, i) => tone(f, i === 4 ? 0.5 : 0.16, "square", 0.05, undefined, i * 0.15));
         break;
+      case "wing":
+        noise(0.06, 0.05, "highpass", 3800);
+        break;
       case "cricket": {
         const base = 3600 + Math.random() * 500;
         for (let i = 0; i < 3; i++) tone(base, 0.035, "square", 0.012, undefined, i * 0.07);
@@ -170,6 +174,36 @@ function createSound() {
 
   return {
     play,
+    // a little waltz (3/4) for the ballroom: bass and two chords under a tune
+    waltz(totalBars = 8) {
+      if (muted) return;
+      const BAR = 0.62;
+      // chords as [bass, [chord notes]] over 8 bars: C F G C / Am F G C
+      const bars: [number, number[]][] = [
+        [131, [330, 392, 523]],
+        [175, [349, 440, 523]],
+        [196, [392, 494, 587]],
+        [131, [330, 392, 523]],
+        [220, [330, 440, 523]],
+        [175, [349, 440, 523]],
+        [196, [392, 494, 587]],
+        [131, [330, 392, 523]],
+      ];
+      const tune = [659, 587, 523, 587, 659, 784, 698, 659, 587, 523, 587, 494, 523, 587, 659, 523];
+      for (let i = 0; i < totalBars; i++) {
+        const [bass, chord] = bars[i % bars.length];
+        const t0 = i * BAR;
+        tone(bass, 0.4, "triangle", 0.13, undefined, t0);
+        chord.forEach((f) => {
+          tone(f, 0.16, "sine", 0.045, undefined, t0 + BAR / 3);
+          tone(f, 0.16, "sine", 0.045, undefined, t0 + (2 * BAR) / 3);
+        });
+        [0, 1].forEach((k) => {
+          const f = tune[(i * 2 + k) % tune.length];
+          tone(f, 0.28, "triangle", 0.1, undefined, t0 + (k * BAR) / 2);
+        });
+      }
+    },
     // a soft piano-ish note for the living-room piano
     note(freq: number) {
       if (muted) return;

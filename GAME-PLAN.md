@@ -40,6 +40,16 @@ The old cottage is now a light-gold **palace** (golden glow on the windows, door
 - **Fishing:** every pond has a bank spot (`FishingGame.tsx`, catches saved in `trail-fish`).
 - **Editable boards:** Sheza and the superadmin walk to a board and edit it (`BoardEditor.tsx`, `POST /api/board`, stored in the `Setting` table as `board.sorry` / `board.kind`, shown live to everyone online through a `server:mod` message and on the next load for others).
 
+## Dancing, birds and jars (Nov 2026)
+- **Princess dance:** Sheza (and the superadmin) get a "👸 Princess dance" action (key 9): a floaty twirl in a flaring pink ball gown with a tiara, sparkles and hearts. Everyone gets a **Waltz** (key 8). Both are synced like the other body actions (`ACTION_SECONDS` in `multiplayer.ts`, drawn in `paintActor`).
+- **Ballroom:** a door in the Great Hall's right wall leads to the ballroom (`palace.ts`, id `ballroom`): gold medallion floor, three chandeliers with fairy lights, mirrors, a buffet, a stage with a harp and a piano. Stand on the dance floor and press Enter to dance (the waltz tune is synthesized in `sound.ts`).
+- **Birds:** about 18 small birds perch on roofs, lamps and benches around the street and fly off when you come close; they sleep at night.
+- **Firefly jars:** jars sit around the street and by the ponds; tap one and a cloud of fireflies floats out (the jar refills after about 100 seconds). State is per browser (`jars` and `swarm` in the game ref).
+- **Fishing** is a bit easier: a larger catch zone, a longer bite window, faster landing, and pulling early no longer loses the fish.
+
+## Sheza's wardrobe (Nov 2026)
+- The bedroom has a grand wardrobe (and the mirror for hair). Only Sheza can open it, and only as the farmer character: pick from 14 dresses (sparkling diamond-white, golden, sapphire, amethyst, ruby, emerald, starry-night, midnight-silver, rainbow gowns and four frocks) and 6 hairstyles in 9 colours, with a turning preview (`Wardrobe.tsx`, drawing in `style.ts`). The choice is saved in the browser (`trail-style`) and sent to everyone with her position (`o`, `hs`, `hc`), so other players see her dressed. The princess dance wears the dress she has on (or the rose gown). Hair colour recolours the brown pixels of the character sheet; hairstyles are extra pixel shapes drawn over the head.
+
 ## Art and license
 Tiles and sprites are from **Sprout Lands** (free Basic pack) by Cup Nooble, extracted to `D:\Sheza Blog\assets\sprout-lands\` (not part of the site). Only the sprites used are copied to `public/game/`.
 - Free license: **non-commercial only**, credit required (shown in the game HUD and `public/game/CREDITS.txt`), no redistributing the pack, no NFT/AI-training use.

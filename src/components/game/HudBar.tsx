@@ -11,10 +11,12 @@ const MORE_EMOJI = [
   "😂", "😮", "😢", "😡", "😍", "😎", "👍", "👎", "🎉", "✨",
   "❓", "❗", "🔥", "🌸", "🍪", "☕", "🌙", "⭐", "🎵", "💭",
 ];
-export const ACTIONS: { k: string; icon: string; label: string }[] = [
+export const ACTIONS: { k: string; icon: string; label: string; owner?: boolean }[] = [
   { k: "!dance", icon: "💃", label: "Dance" },
   { k: "!jump", icon: "🦘", label: "Jump" },
   { k: "!spin", icon: "🔄", label: "Spin" },
+  { k: "!waltz", icon: "🎶", label: "Waltz" },
+  { k: "!princess", icon: "👸", label: "Princess", owner: true }, // Sheza and the superadmin
 ];
 
 // The bar along the bottom: chat, sound, who is online, emojis and actions,
@@ -182,20 +184,23 @@ export function HudBar({
             ))}
           </div>
           <div className="g-action-row">
-            {ACTIONS.map((a, i) => (
+            {ACTIONS.map((a, i) =>
+              a.owner && !canAdmin ? null : (
               <button
                 key={a.k}
                 type="button"
-                className="g-action"
+                className={`g-action${a.owner ? " g-action-owner" : ""}`}
                 onClick={() => {
                   emotes.onSend(a.k);
                   emotes.onClose();
                 }}
                 title={`${a.label} (${i + 5})`}
               >
-                {a.icon} {a.label}
+                <span className="g-action-icon">{a.icon}</span>
+                <span className="g-action-label">{a.label}</span>
               </button>
-            ))}
+              ),
+            )}
           </div>
         </div>
       )}

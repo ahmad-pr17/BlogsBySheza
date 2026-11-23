@@ -144,3 +144,168 @@
   outline: none;
   background: #ffe29a;
 }
+
+/* Sheza's wardrobe */
+.g-ward-card {
+  width: min(600px, 100%);
+  max-height: min(94vh, 760px);
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+.g-ward-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.g-ward-head .g-pick-title {
+  margin: 0;
+}
+.g-ward-x {
+  width: 34px;
+  height: 34px;
+  font: inherit;
+  font-size: 16px;
+  color: #5c3416;
+  background: #fde39a;
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-ward-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px;
+  background: linear-gradient(180deg, #f6e3ff, #ffe9c9);
+  border: 3px solid var(--wood-dark);
+  border-radius: 8px;
+}
+.g-ward-preview {
+  width: 180px;
+  height: 204px;
+  image-rendering: pixelated;
+}
+.g-ward-turn {
+  width: 38px;
+  height: 38px;
+  font: inherit;
+  color: #5c3416;
+  background: #fde39a;
+  border: 2px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-ward-now {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+}
+.g-ward-tabs {
+  display: flex;
+  gap: 6px;
+}
+.g-ward-tabs button {
+  flex: 1;
+  min-height: 38px;
+  font: inherit;
+  font-size: 15px;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-ward-tabs button.on {
+  background: #f6c453;
+}
+.g-ward-label {
+  margin: 2px 0 0;
+  font-size: 14px;
+  opacity: 0.8;
+}
+.g-ward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+.g-ward-opt {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  padding: 4px 2px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.15;
+  color: #5c3416;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.g-ward-opt.on {
+  background: #fde39a;
+  border-color: #c98a1d;
+  box-shadow: inset 0 0 0 2px #fff3d2;
+}
+.g-ward-opt:hover,
+.g-ward-opt:focus-visible {
+  outline: none;
+  background: #ffe9a8;
+}
+.g-ward-opt small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+.g-ward-thumb {
+  width: 90px;
+  height: 102px;
+  image-rendering: pixelated;
+}
+.g-ward-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.g-ward-color {
+  width: 38px;
+  height: 38px;
+  border: 3px solid var(--wood-dark);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.g-ward-color.on {
+  outline: 3px solid #f6c453;
+  outline-offset: 2px;
+}
+
+/* The emotes panel: body-action buttons */
+div.g-action-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(66px, 1fr));
+  gap: 6px;
+}
+button.g-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 58px;
+  padding: 5px 4px;
+}
+.g-action-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.g-action-label {
+  font-size: 13px;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+}
+button.g-action.g-action-owner {
+  background: #ffd9ea;
+  border-color: #c96a90;
+}

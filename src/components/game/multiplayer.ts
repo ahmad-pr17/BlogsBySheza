@@ -7,6 +7,7 @@ import { cleanRemoteMessage, cleanRemoteName } from "@/components/game/names";
 // Nothing is stored: positions are broadcast only while a visitor is online.
 
 import { type Scene, sceneCode, sceneFromCode } from "@/components/game/scenes";
+import { HAIR_COLORS, HAIR_STYLES, OUTFITS } from "@/components/game/style";
 
 export type { Scene };
 
@@ -17,6 +18,9 @@ export type Remote = {
   owner: boolean; // Sheza, the blog's owner
   kind: string; // which character (see characters.ts)
   tint: number; // farmer shirt colour
+  outfit: number; // Sheza's dress, hairstyle and hair colour (see style.ts)
+  hairStyle: number;
+  hairColor: number;
   x: number;
   y: number;
   tx: number; // target position from the network
@@ -44,6 +48,9 @@ export type MpState = {
   fly: boolean;
   scene: Scene;
   read: string; // slug of the post being read, or empty
+  outfit?: number;
+  hairStyle?: number;
+  hairColor?: number;
 };
 
 export type PlayerInfo = {
@@ -73,7 +80,13 @@ export function randomName(label: string) {
 }
 
 // Body actions a character can do, and how long each lasts (seconds).
-export const ACTION_SECONDS: Record<string, number> = { "!dance": 3, "!jump": 0.7, "!spin": 1.2 };
+export const ACTION_SECONDS: Record<string, number> = {
+  "!dance": 3,
+  "!jump": 0.7,
+  "!spin": 1.2,
+  "!waltz": 9,
+  "!princess": 14,
+};
 const ACTIONS = new Set(Object.keys(ACTION_SECONDS));
 
 export const TINTS = 3; // farmer shirt colours: the two visitor ones plus Sheza's pink
@@ -112,6 +125,9 @@ export function connectMultiplayer(opts: {
         owner: cid.startsWith("owner:"),
         kind: m?.kind ?? "farmer",
         tint: m?.tint ?? 0,
+        outfit: 0,
+        hairStyle: 0,
+        hairColor: 0,
         x: 0,
         y: 0,
         tx: 0,
@@ -152,7 +168,7 @@ export function connectMultiplayer(opts: {
       await channel.subscribe("p", (msg) => {
         const cid = msg.clientId;
         if (!cid || cid === me()) return;
-        const d = msg.data as { x: number; y: number; d: number; m: number; f: number; s: number; r?: string };
+        const d = msg.data as { x: number; y: number; d: number; m: number; f: number; s: number; r?: string; o?: number; hs?: number; hc?: number };
         if (typeof d?.x !== "number" || typeof d?.y !== "number") return;
         const r = upsert(cid);
         r.tx = d.x;
@@ -166,6 +182,10 @@ export function connectMultiplayer(opts: {
         r.fly = d.f === 1;
         r.scene = sceneFromCode(d.s);
         r.reading = typeof d.r === "string" ? d.r.slice(0, 80) : "";
+        const idx = (v: unknown, max: number) => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < max ? v : 0);
+        r.outfit = idx(d.o, OUTFITS.length);
+        r.hairStyle = idx(d.hs, HAIR_STYLES.length);
+        r.hairColor = idx(d.hc, HAIR_COLORS.length);
         r.seen = Date.now();
       });
 
@@ -317,7 +337,7 @@ export function connectMultiplayer(opts: {
     send(s) {
       if (!connected()) return;
       const now = performance.now();
-      const key = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving ? 1 : 0},${s.fly ? 1 : 0},${s.scene},${s.read}`;
+      const key = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving ? 1 : 0},${s.fly ? 1 : 0},${s.scene},${s.read},${s.outfit ?? 0},${s.hairStyle ?? 0},${s.hairColor ?? 0}`;
       const changed = key !== lastKey;
       // while moving: about 8 updates a second; idle: a heartbeat every 4s
       if (changed ? now - lastSent < 120 : now - lastSent < 4000) return;
@@ -332,6 +352,9 @@ export function connectMultiplayer(opts: {
           f: s.fly ? 1 : 0,
           s: sceneCode(s.scene),
           r: s.read,
+          o: s.outfit ?? 0,
+          hs: s.hairStyle ?? 0,
+          hc: s.hairColor ?? 0,
         })
         .catch(() => {});
     },

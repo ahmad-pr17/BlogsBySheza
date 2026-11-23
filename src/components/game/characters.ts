@@ -32,7 +32,7 @@ export function isKind(v: unknown): v is CharKind {
 // Where the top of the head is inside a 32px-tall sprite cell (for halos, name
 // tags and emote bubbles to sit just above it).
 export const HEAD_TOP: Record<CharKind, number> = {
-  farmer: 4,
+  farmer: 9, // the top of the bushy hair
   fox: 6,
   bear: 8,
   bunny: 2,

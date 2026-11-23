@@ -14,6 +14,7 @@ import { T, type Interact, type Obj, type World } from "@/components/game/world"
 //   Living room           TV, piano, sofa, the cat
 //   Bedroom (upstairs)    sleep, flowers, posters; a door to the study
 //   Study (upstairs)      bookshelves full of readable books
+//   Ballroom              a waltz floor, harp and piano; through a door in the Great Hall
 
 export const HC = 20;
 export const HR = 15;
@@ -26,6 +27,7 @@ export const ROOM_NAMES: Record<RoomId, string> = {
   living: "Living room",
   bedroom: "Bedroom",
   study: "Study",
+  ballroom: "Ballroom",
 };
 
 // Where the exit door at the bottom of each room leads.
@@ -35,6 +37,7 @@ export const EXIT_TO: Record<RoomId, Scene> = {
   living: "home",
   bedroom: "home",
   study: "bedroom",
+  ballroom: "home",
 };
 
 // Where you appear when you walk from one scene into a room.
@@ -43,6 +46,7 @@ export function arrival(to: RoomId, from: Scene): { x: number; y: number; dir: n
     if (from === "kitchen") return { x: 58, y: 98, dir: 4 };
     if (from === "living") return { x: 262, y: 98, dir: 4 };
     if (from === "bedroom") return { x: 160, y: 142, dir: 4 };
+    if (from === "ballroom") return { x: 292, y: 152, dir: 6 };
   }
   if (to === "bedroom" && from === "study") return { x: 276, y: 100, dir: 4 };
   return { x: 160, y: 198, dir: 0 };
@@ -78,6 +82,7 @@ const CLOCK: Record<RoomId, [number, number]> = {
   living: [154, 8],
   bedroom: [194, 12],
   study: [115, 12],
+  ballroom: [74, 14],
 };
 
 const WINDOWS: Record<RoomId, [number, number, number, number][]> = {
@@ -86,6 +91,7 @@ const WINDOWS: Record<RoomId, [number, number, number, number][]> = {
   living: [[52, 12, 32, 34], [236, 12, 32, 34]],
   bedroom: [[124, 12, 32, 32]],
   study: [[132, 10, 40, 34]],
+  ballroom: [[44, 10, 28, 34], [146, 10, 28, 34], [248, 10, 28, 34]],
 };
 
 // the pot on the stove, for steam
@@ -187,7 +193,7 @@ export function buildRoom(id: RoomId, stage = 0): World {
       spot(`knight${i}`, `knight:${i}`, "Guard", "Talk to the guard", x, y, x + (x < 160 ? -14 : 14), y + 4, 16, 16);
     });
     put("armorStand", 32, 112, { cols: [1, 1], rows: [6, 6] });
-    put("armorStand", 288, 112, { cols: [18, 18], rows: [6, 6] });
+    spot("ballroom", "go:ballroom", "Ballroom", "Go to the ballroom", 306, 140, 294, 150, 22, 24);
     put("armorStand", 32, 200, { cols: [1, 1], rows: [12, 12] });
     put("bigPlant", 288, 214, { cols: [18, 18], rows: [13, 13] });
   }
@@ -254,7 +260,8 @@ export function buildRoom(id: RoomId, stage = 0): World {
     put("vaseFlowers", 26, 90, { lift: 14 });
     put("nightstand", 98, 90, { cols: [6, 6], rows: [4, 4] });
     put("vaseFlowers", 98, 90.2, { lift: 14 });
-    put("wardrobe", 238, 96, { cols: [14, 15], rows: [4, 5] });
+    put("grandWardrobe", 238, 106, { cols: [13, 16], rows: [4, 6] });
+    spot("wardrobe", "wardrobe", "Wardrobe", "Open the wardrobe", 238, 106, 238, 126, 18, 32);
     put("mirror", 198, 100, { cols: [12, 12], rows: [5, 5] });
     spot("mirror", "mirror", "Mirror", "Look in the mirror", 198, 100, 198, 116, 16, 18);
     spot("study", "go:study", "Study", "Go to the study", 276, 76, 276, 90, 12, 22);
@@ -295,6 +302,28 @@ export function buildRoom(id: RoomId, stage = 0): World {
     put("bigPlant", 292, 214, { cols: [18, 18], rows: [13, 13] });
     put("bigPlant", 30, 214, { cols: [1, 1], rows: [13, 13] });
     if (stage >= 2) put("bookStack", 200, 200);
+  }
+
+  if (id === "ballroom") {
+    put("f_runnerShort", 160, 226, { flat: true });
+    // the orchestra's corner: stage, harp and piano
+    put("f_stage", 262, 120, { flat: true });
+    put("harp", 236, 108, { cols: [14, 15], rows: [5, 6] });
+    spot("harp", "harp", "Harp", "Play the harp", 236, 108, 236, 128, 14, 22);
+    put("piano", 278, 116, { cols: [16, 18], rows: [5, 6] });
+    spot("piano", "piano", "Piano", "Play the piano", 278, 116, 278, 134, 16, 26);
+    // a buffet along the left, with flowers and candles
+    put("diningTable", 60, 108, { cols: [2, 5], rows: [5, 6] });
+    put("vaseFlowers", 44, 94, { lift: 14 });
+    put("vaseFlowers", 76, 94.2, { lift: 14 });
+    put("topiary", 112, 104, { cols: [7, 7], rows: [5, 5] });
+    put("topiary", 196, 104, { cols: [12, 12], rows: [5, 5] });
+    put("pillar", 34, 214, { cols: [2, 2], rows: [12, 12] });
+    put("pillar", 286, 214, { cols: [17, 17], rows: [12, 12] });
+    put("bigPlant", 30, 160, { cols: [1, 1], rows: [9, 9] });
+    put("bigPlant", 292, 170, { cols: [18, 18], rows: [10, 10] });
+    // the dance floor in the middle
+    spot("dance", "dance", "Dance floor", "Dance", 160, 154, 160, 154, 12, 52);
   }
 
   objects.sort((a, b) => a.y - b.y);
@@ -513,6 +542,15 @@ export function buildRoomBg(id: RoomId, art: Art): HTMLCanvasElement {
     R(c, P.goldD, 0, 63, W, 1);
     sideWalls(c, "#e0c87c", "#b8964a");
     doorway(c, P.goldD, "#f1e3b4");
+    // a tall double door in the right-hand wall: the ballroom
+    R(c, "#3a2a22", 303, 112, 17, 62);
+    R(c, P.gold, 305, 114, 13, 58);
+    R(c, "#8a4a3a", 306, 116, 11, 54);
+    R(c, "#a9604a", 306, 116, 5, 54);
+    R(c, P.goldD, 311, 116, 1, 54);
+    R(c, P.goldL, 307, 142, 2, 3);
+    R(c, P.goldL, 314, 142, 2, 3);
+    R(c, P.goldL, 307, 110, 10, 2);
     // rose window above the stairs
     R(c, "#2a1f1c", 144, 6, 32, 32);
     for (let yy = 0; yy < 28; yy++)
@@ -668,6 +706,67 @@ export function buildRoomBg(id: RoomId, art: Art): HTMLCanvasElement {
     // the door to the study
     archWay(c, 262, 28, 28, 36, "#5a3d2a");
     R(c, P.goldD, 272, 46, 8, 1);
+    clock(c, art, id);
+  } else if (id === "ballroom") {
+    // polished cream-and-gold floor with a big gold medallion
+    checker(c, 16, 64, 288, 160, "#f8ecc2", "#e8d49c");
+    floorShade(c);
+    c.save();
+    c.beginPath();
+    c.rect(16, 64, 288, 160);
+    c.clip();
+    for (const [rx, ry, col] of [[84, 38, P.goldD], [78, 34, "#fbf0c8"], [72, 31, P.gold], [66, 28, "#f4e2a8"]] as [number, number, string][]) {
+      c.fillStyle = col;
+      c.beginPath();
+      c.ellipse(160, 154, rx, ry, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    // an eight-pointed star inlaid in the middle
+    c.fillStyle = P.goldD;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      c.beginPath();
+      c.moveTo(160 + Math.cos(a) * 56, 154 + Math.sin(a) * 25);
+      c.lineTo(160 + Math.cos(a + 0.2) * 14, 154 + Math.sin(a + 0.2) * 7);
+      c.lineTo(160 + Math.cos(a - 0.2) * 14, 154 + Math.sin(a - 0.2) * 7);
+      c.closePath();
+      c.fill();
+    }
+    c.fillStyle = P.goldL;
+    c.beginPath();
+    c.ellipse(160, 154, 10, 5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    // cream wall with gold pilasters and red velvet drapes
+    R(c, "#f3e3b6", 0, 0, W, 64);
+    for (let x = 6; x < W; x += 20) R(c, "#e8d49c", x, 8, 1, 40);
+    R(c, "#a8323a", 0, 46, W, 18);
+    for (let x = 4; x < W; x += 24) {
+      R(c, "#7a1f2b", x, 50, 20, 11);
+      R(c, "#c04650", x + 1, 51, 18, 9);
+    }
+    R(c, P.gold, 0, 46, W, 1);
+    R(c, P.goldD, 0, 47, W, 1);
+    R(c, "#3a2a22", 0, 0, W, 6);
+    R(c, P.gold, 0, 6, W, 2);
+    sideWalls(c, "#e0c87c", "#b8964a");
+    doorway(c, P.goldD, "#f1e3b4");
+    for (const w of WINDOWS.ballroom) windowFrame(c, w, "#a8323a", "#7a1f2b", P.goldD);
+    // tall gold-framed mirrors on the back wall
+    for (const mx of [92, 190]) {
+      R(c, P.out, mx - 2, 10, 46, 52);
+      R(c, P.gold, mx - 1, 11, 44, 50);
+      R(c, "#cfe6f2", mx + 2, 14, 38, 44);
+      R(c, "#e6f4fa", mx + 2, 14, 38, 8);
+      for (let i = 0; i < 5; i++) R(c, "rgba(255,255,255,0.45)", mx + 6 + i * 7, 16 + i * 3, 2, 18);
+      R(c, P.goldL, mx - 1, 11, 44, 1);
+    }
+    // gilded pilasters between the windows and mirrors
+    for (const px of [78, 140, 180, 238, 290]) {
+      R(c, P.goldD, px, 8, 5, 56);
+      R(c, P.gold, px + 1, 8, 3, 56);
+      R(c, P.goldL, px + 1, 8, 1, 56);
+    }
     clock(c, art, id);
   } else {
     // study: dark wood floor and panelled walls
@@ -871,6 +970,7 @@ const LIGHT_SRC: Record<RoomId, [number, number, number, number][]> = {
   living: [[160, 70, 78, 1], [62, 142, 44, 0.8], [252, 168, 44, 0.8], [160, 150, 80, 0.5]],
   bedroom: [[26, 76, 36, 1], [98, 76, 36, 1], [262, 184, 38, 0.8], [130, 40, 44, 0.6], [60, 110, 56, 0.5]],
   study: [[86, 150, 46, 1], [214, 112, 40, 0.8], [160, 142, 78, 0.8], [220, 22, 44, 0.4]],
+  ballroom: [[80, 28, 72, 1], [160, 28, 84, 1], [240, 28, 72, 1], [160, 150, 96, 0.55]],
 };
 
 let maskCv: HTMLCanvasElement | null = null;
@@ -984,6 +1084,45 @@ export function drawRoomScene(
     const sway = Math.sin(t * 0.8) * 1.2;
     c.drawImage(ch, Math.round(160 - ch.width / 2 + sway), 2);
     for (const cx of [4, 12, 21, 30, 37]) flame(c, Math.round(160 - ch.width / 2 + cx + 1 + sway), 14, t, cx, 0.5);
+  }
+
+  // the ballroom: three chandeliers, strings of golden lights and sparkles on the floor
+  if (id === "ballroom") {
+    const ch = art.sprites["chandelier"] as Img;
+    for (const [i, cx] of [80, 160, 240].entries()) {
+      const sway = Math.sin(t * 0.8 + i) * 1.2;
+      const ox = Math.round(cx - ch.width / 2 + sway);
+      c.drawImage(ch, ox, 2);
+      for (const fx of [4, 12, 21, 30, 37]) flame(c, ox + fx + 1, 14, t, fx + i, 0.5);
+    }
+    for (const [a, b] of [[16, 80], [80, 160], [160, 240], [240, 304]]) {
+      const n = Math.round((b - a) / 7);
+      for (let k = 1; k < n; k++) {
+        const f = k / n;
+        const bx = a + (b - a) * f;
+        const by = 9 + Math.sin(f * Math.PI) * 5;
+        R(c, "rgba(120,86,30,0.7)", Math.round(bx), Math.round(by) - 1, 1, 1);
+        R(c, Math.sin(t * 2.6 + k * 1.3 + a) > -0.3 ? "#fff3a8" : "#a8864a", Math.round(bx), Math.round(by), 2, 2);
+      }
+    }
+    for (let i = 0; i < 16; i++) {
+      const on = Math.sin(t * 2.2 + i * 2.1) > 0.2;
+      if (!on) continue;
+      const sx = 40 + ((i * 53) % 240);
+      const sy = 80 + ((i * 37) % 130);
+      R(c, "rgba(255,246,190,0.9)", sx, sy, 1, 1);
+      R(c, "rgba(255,246,190,0.35)", sx - 1, sy, 3, 1);
+      R(c, "rgba(255,246,190,0.35)", sx, sy - 1, 1, 3);
+    }
+    c.globalCompositeOperation = "lighter";
+    for (const cx of [80, 160, 240]) {
+      const g = c.createRadialGradient(cx, 30, 0, cx, 30, 60);
+      g.addColorStop(0, `rgba(255,215,110,${0.2 + s.light.dark * 0.08})`);
+      g.addColorStop(1, "rgba(255,215,110,0)");
+      c.fillStyle = g;
+      c.fillRect(cx - 60, 0, 120, 100);
+    }
+    c.globalCompositeOperation = "source-over";
   }
 
   // someone asleep in the bed

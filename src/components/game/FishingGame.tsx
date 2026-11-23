@@ -87,8 +87,8 @@ function pickFish(): Fish {
   return FISH[0];
 }
 
-const ZONE = 0.3;
-const CATCH_SECONDS = 3;
+const ZONE = 0.36; // a bit bigger catch zone than before
+const CATCH_SECONDS = 2.4; // and a bit quicker to land a fish
 
 export function FishingGame(props: {
   onClose: () => void;
@@ -171,20 +171,19 @@ export function FishingGame(props: {
     timerRef.current = window.setTimeout(() => {
       sound("splash");
       setPhase("waiting");
-      const wait = 1500 + Math.random() * 3500;
+      const wait = 1200 + Math.random() * 2600;
       timerRef.current = window.setTimeout(() => {
         fishRef.current = pickFish();
         setPhase("bite");
         sound("splash");
-        timerRef.current = window.setTimeout(escape, 900);
+        timerRef.current = window.setTimeout(escape, 1500); // more time to react
       }, wait);
     }, 700);
   }, [clearTimer, escape, setPhase, sound]);
 
   const hook = useCallback(() => {
     if (phaseRef.current === "waiting") {
-      // pulled too early
-      escape();
+      // nothing is biting yet: keep waiting (no penalty for being eager)
       return;
     }
     if (phaseRef.current !== "bite") return;
@@ -192,7 +191,7 @@ export function FishingGame(props: {
     heldRef.current = false;
     setPhase("reeling");
     sound("tap");
-  }, [clearTimer, escape, setPhase, sound]);
+  }, [clearTimer, setPhase, sound]);
 
   // Keyboard
   useEffect(() => {
@@ -247,10 +246,10 @@ export function FishingGame(props: {
         retarget = (0.4 + Math.random() * 0.8) / speed;
       }
       fishPos += (target - fishPos) * Math.min(1, dt * 3.2 * speed);
-      zone += (heldRef.current ? 0.6 : -0.5) * dt;
+      zone += (heldRef.current ? 0.75 : -0.42) * dt;
       zone = Math.max(0, Math.min(1 - ZONE, zone));
       const inside = fishPos >= zone && fishPos <= zone + ZONE;
-      progress += (inside ? 1 / CATCH_SECONDS : -1 / (CATCH_SECONDS * 1.4)) * dt;
+      progress += (inside ? 1 / CATCH_SECONDS : -1 / (CATCH_SECONDS * 2.2)) * dt;
       if (zoneEl.current) {
         zoneEl.current.style.bottom = `${zone * 100}%`;
         zoneEl.current.style.height = `${ZONE * 100}%`;
