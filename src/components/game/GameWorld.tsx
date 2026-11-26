@@ -94,6 +94,9 @@ import {
   type Stop,
 } from "@/components/game/world";
 
+// the colours of the dance glow: yellow and blue
+const DANCE_HUES = [48, 215];
+
 const SPEED = 62; // logical px / second
 const NEAR = 30; // how close counts as "at" an interactable
 const SUBSCRIBE = "__subscribe";
@@ -1639,7 +1642,7 @@ export function GameWorld({
 
       const flyLift = (fly: boolean) => (fly ? 11 + Math.sin(t * 5) * 1.5 : 0);
       // Dancers' glows, drawn again after the night colour grade so they still shine in the dark.
-      const danceGlows: { px: number; py: number; hue: number; r: number; dance: boolean; age: number }[] = [];
+      const danceGlows: { px: number; py: number; r: number; dance: boolean; age: number }[] = [];
       const flushDanceGlows = () => {
         if (!danceGlows.length) return;
         const k = Math.min(1, dark * 1.4); // how much the dark makes the glow stand out
@@ -1647,30 +1650,36 @@ export function GameWorld({
         ctx.globalCompositeOperation = "lighter";
         for (const d of danceGlows) {
           const r = d.r * (1 + k * 0.5);
-          ctx.save();
-          ctx.translate(d.px, d.py - 1);
-          ctx.scale(1, 0.55);
-          const g1 = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-          g1.addColorStop(0, `hsla(${d.hue},100%,62%,${0.12 + k * 0.6})`);
-          g1.addColorStop(0.6, `hsla(${d.hue},100%,60%,${0.05 + k * 0.28})`);
-          g1.addColorStop(1, `hsla(${d.hue},100%,60%,0)`);
-          ctx.fillStyle = g1;
-          ctx.fillRect(-r, -r, r * 2, r * 2);
-          ctx.restore();
-          if (k > 0.05) {
-            // a soft halo around the dancer as well, so the whole figure seems lit
-            const g2 = ctx.createRadialGradient(d.px, d.py - 14, 0, d.px, d.py - 14, 24);
-            g2.addColorStop(0, `hsla(${d.hue},100%,65%,${0.28 * k})`);
-            g2.addColorStop(1, `hsla(${d.hue},100%,65%,0)`);
-            ctx.fillStyle = g2;
-            ctx.fillRect(d.px - 24, d.py - 38, 48, 48);
-          }
+          DANCE_HUES.forEach((hue, i) => {
+            const a3 = t * 2.4 + i * Math.PI;
+            const ox = Math.cos(a3) * r * 0.28;
+            const oy = Math.sin(a3) * r * 0.28 * 0.55;
+            ctx.save();
+            ctx.translate(d.px + ox, d.py - 1 + oy);
+            ctx.scale(1, 0.55);
+            const g1 = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.85);
+            g1.addColorStop(0, `hsla(${hue},100%,60%,${0.1 + k * 0.5})`);
+            g1.addColorStop(0.6, `hsla(${hue},100%,58%,${0.04 + k * 0.24})`);
+            g1.addColorStop(1, `hsla(${hue},100%,58%,0)`);
+            ctx.fillStyle = g1;
+            ctx.fillRect(-r, -r, r * 2, r * 2);
+            ctx.restore();
+            if (k > 0.05) {
+              // a soft halo around the dancer as well, so the whole figure seems lit
+              const hx = d.px + (i ? 4 : -4);
+              const g2 = ctx.createRadialGradient(hx, d.py - 14, 0, hx, d.py - 14, 22);
+              g2.addColorStop(0, `hsla(${hue},100%,65%,${0.22 * k})`);
+              g2.addColorStop(1, `hsla(${hue},100%,65%,0)`);
+              ctx.fillStyle = g2;
+              ctx.fillRect(hx - 22, d.py - 36, 44, 44);
+            }
+          });
           if (d.dance) {
-            // little lights twirling up around the dancer
+            // little blue and yellow lights twirling up around the dancer
             for (let i = 0; i < 8; i++) {
               const a2 = d.age * 3 + (i / 8) * Math.PI * 2;
               const rise = (d.age * 0.9 + i * 0.125) % 1;
-              ctx.fillStyle = `hsla(${(d.hue + i * 45) % 360},100%,72%,${1 - rise})`;
+              ctx.fillStyle = `hsla(${DANCE_HUES[i % 2]},100%,70%,${1 - rise})`;
               ctx.fillRect(Math.round(d.px + Math.cos(a2) * 11), Math.round(d.py - 4 - rise * 26), 2, 2);
             }
           }
@@ -1767,31 +1776,28 @@ export function GameWorld({
         ctx.fillStyle = fly ? "rgba(53,55,56,0.2)" : "rgba(53,55,56,0.28)";
         ctx.fillRect(px - 5, py - 2, 10, 2);
         ctx.fillRect(px - 3, py - 3, 6, 1);
-        // Dancing makes a glowing pool of light on the floor: colours that cycle for
-        // the dance, gold for the waltz, rose for the princess dance. A normal-blend
-        // layer shows on pale floors too (a glow that only adds light vanishes on
-        // marble), and an additive layer on top makes it shine.
+        // Dancing makes a glowing pool of light on the floor: a blue and a yellow
+        // light that swirl around each other. A normal-blend layer shows on pale
+        // floors too (a glow that only adds light vanishes on marble); the
+        // additive layer after the night grade (flushDanceGlows) makes it shine.
         if (action === "!dance" || action === "!waltz" || action === "!princess") {
-          const hue = action === "!dance" ? (t * 120) % 360 : action === "!waltz" ? 45 : 340;
           const r = (action === "!dance" ? 30 : 27) * (1 + Math.sin(t * 6) * 0.1);
           ctx.save();
           ctx.translate(px, py - 1);
           ctx.scale(1, 0.55); // a pool on the floor, not a ball
-          const pool = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-          pool.addColorStop(0, `hsla(${hue},95%,60%,0.6)`);
-          pool.addColorStop(0.55, `hsla(${hue},95%,62%,0.3)`);
-          pool.addColorStop(1, `hsla(${hue},95%,65%,0)`);
-          ctx.fillStyle = pool;
-          ctx.fillRect(-r, -r, r * 2, r * 2);
-          ctx.globalCompositeOperation = "lighter";
-          const shine = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.7);
-          shine.addColorStop(0, `hsla(${hue},100%,70%,0.45)`);
-          shine.addColorStop(1, `hsla(${hue},100%,70%,0)`);
-          ctx.fillStyle = shine;
-          ctx.fillRect(-r, -r, r * 2, r * 2);
+          DANCE_HUES.forEach((hue, i) => {
+            const a3 = t * 2.4 + i * Math.PI;
+            const ox = Math.cos(a3) * r * 0.28;
+            const oy = Math.sin(a3) * r * 0.28;
+            const pool = ctx.createRadialGradient(ox, oy, 0, ox, oy, r * 0.85);
+            pool.addColorStop(0, `hsla(${hue},95%,58%,0.55)`);
+            pool.addColorStop(0.6, `hsla(${hue},95%,60%,0.25)`);
+            pool.addColorStop(1, `hsla(${hue},95%,62%,0)`);
+            ctx.fillStyle = pool;
+            ctx.fillRect(-r * 1.3, -r * 1.3, r * 2.6, r * 2.6);
+          });
           ctx.restore();
-          ctx.globalCompositeOperation = "source-over";
-          danceGlows.push({ px, py, hue, r, dance: action === "!dance", age: actAge });
+          danceGlows.push({ px, py, r, dance: action === "!dance", age: actAge });
         }
         if (isSuper && fly) {
           const fw = Math.sin(t * 14) > 0 ? 6 : 4;
