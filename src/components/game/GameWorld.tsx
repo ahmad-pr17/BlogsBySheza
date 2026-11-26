@@ -35,6 +35,7 @@ import { FishingGame } from "@/components/game/FishingGame";
 import { Library } from "@/components/game/Library";
 import { PianoModal } from "@/components/game/PianoModal";
 import { TvModal } from "@/components/game/TvModal";
+import { CanAdminContext } from "@/components/game/AdminContext";
 import { Easel } from "@/components/game/Easel";
 import { StudyDesk } from "@/components/game/StudyDesk";
 import { composeRooms } from "@/components/game/gallery";
@@ -176,7 +177,12 @@ export function GameWorld({
   const admin = role === "super";
   const owner = role === "owner";
   const canAdmin = role !== "visitor";
-  const world = useMemo(() => buildWorld(stops, canAdmin, canAdmin), [stops, canAdmin]);
+  // A refresh hands us new "stops" objects even when nothing changed; only
+  // rebuild the town when the posts really changed.
+  const stopsKey = JSON.stringify(stops);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableStops = useMemo(() => stops, [stopsKey]);
+  const world = useMemo(() => buildWorld(stableStops, canAdmin, canAdmin), [stableStops, canAdmin]);
   const [cooked, setCooked] = useState(0); // meals cooked in this browser
   const homeStage = stageFor(cooked);
   const rooms = useMemo(
@@ -231,6 +237,7 @@ export function GameWorld({
   // what everyone shares (jars, TV, jukebox, study timer), as far as we know
   const shared = useRef<{ tv: number | null; song: { id: string; playing: boolean } | null }>({ tv: null, song: null });
   const worldHandler = useRef<(e: WorldEvent) => void>(() => {});
+  const contentChanged = useRef<() => void>(() => {});
   const applyGallery = (e: GalleryEvent) =>
     setGallery((prev) =>
       e.op === "remove"
@@ -423,6 +430,7 @@ export function GameWorld({
       },
       onEvent: (kind) => sound.play(kind === "chat" ? "chat" : "pop"),
       onWorld: (e) => worldHandler.current(e),
+      onContent: () => contentChanged.current(),
       onGallery: (e) => applyGallery(e),
       getWorld: (): WorldState => {
         const now = performance.now();
@@ -755,6 +763,34 @@ export function GameWorld({
     hide();
   }, []);
   const playSound = useCallback((name: string) => sound.play(name as SoundName), []);
+
+  // New posts, songs or comments appear without a reload: when the server says
+  // something changed (or the tab comes back after a while), fetch the page's
+  // data again. Players wait a random moment so they do not all ask at once.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let last = Date.now();
+    const refresh = () => {
+      last = Date.now();
+      router.refresh();
+    };
+    contentChanged.current = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        refresh();
+      }, 300 + Math.random() * 2500);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && Date.now() - last > 60000) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      contentChanged.current = () => {};
+    };
+  }, [router]);
 
   // Let the fireflies out of a jar. Whoever opens it, it opens for everyone:
   // the jar is empty for a while on every screen.
@@ -2855,7 +2891,7 @@ export function GameWorld({
             // unchanged. Built here (not on the server) so only owners ever get it.
             <iframe src="/admin" title="Admin" className="admin-frame" />
           ) : (
-            nodes[openKey]
+            <CanAdminContext.Provider value={canAdmin}>{nodes[openKey]}</CanAdminContext.Provider>
           )}
         </PostModal>
       )}

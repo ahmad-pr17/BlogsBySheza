@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { notifyOwnerOfComment } from "@/lib/email";
+import { announceChange } from "@/lib/announce";
 
 const MAX_BODY = 5000;
 const MAX_NAME = 80;
@@ -46,5 +47,6 @@ export async function POST(request: Request) {
     ).catch((err) => console.error("[comments] notify failed:", err)),
   );
 
+  await announceChange("comments");
   return NextResponse.json(comment, { status: 201 });
 }

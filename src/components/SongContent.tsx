@@ -1,4 +1,5 @@
 import { Panel } from "@/components/Panel";
+import { SongFinder } from "@/components/SongFinder";
 import { SongPlayer } from "@/components/SongPlayer";
 import type { getAllSongs } from "@/lib/songs";
 
@@ -23,6 +24,7 @@ export function SongContent({ songs }: { songs: Songs }) {
             </li>
           ))}
         </ul>
+        <SongFinder />
       </div>
     </Panel>
   );

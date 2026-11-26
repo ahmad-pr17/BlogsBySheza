@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/session";
 import { generateUniqueSlug } from "@/lib/slug";
 import { announceToSubscribers } from "@/lib/subscribers";
+import { announceChange } from "@/lib/announce";
 
 export async function GET(request: Request) {
   if (!(await isAdminAuthenticated())) {
@@ -74,5 +75,6 @@ export async function POST(request: Request) {
     await announceToSubscribers(post, "new");
   }
 
+  await announceChange("posts");
   return NextResponse.json(post, { status: 201 });
 }

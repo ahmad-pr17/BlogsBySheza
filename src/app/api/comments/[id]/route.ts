@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/session";
+import { announceChange } from "@/lib/announce";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -17,5 +18,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   }
 
   await prisma.comment.delete({ where: { id } });
+  await announceChange("comments");
   return NextResponse.json({ success: true });
 }

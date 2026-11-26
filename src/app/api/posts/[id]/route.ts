@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/session";
 import { generateUniqueSlug } from "@/lib/slug";
 import { announceToSubscribers } from "@/lib/subscribers";
+import { announceChange } from "@/lib/announce";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  await announceChange("posts");
   return NextResponse.json(post);
 }
 
@@ -93,6 +95,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     }
   }
 
+  await announceChange("posts");
   return NextResponse.json(post);
 }
 
@@ -132,6 +135,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     await announceToSubscribers(post, "new");
   }
 
+  await announceChange("posts");
   return NextResponse.json(post);
 }
 
@@ -147,5 +151,6 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   }
 
   await prisma.post.delete({ where: { id } });
+  await announceChange("posts");
   return NextResponse.json({ success: true });
 }

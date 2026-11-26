@@ -147,6 +147,7 @@ export function connectMultiplayer(opts: {
   onSilenced?: (ms: number) => void; // a moderator silenced you
   onBoard?: (id: string, board: unknown) => void; // a notice board was edited
   onGallery?: (e: GalleryEvent) => void; // a painting was hung, moved or taken down
+  onContent?: () => void; // the server says posts, songs or comments changed
   onWorld?: (e: WorldEvent) => void; // someone changed something shared (jar, TV, music, timer)
   getWorld?: () => WorldState; // our view of the shared things, for newcomers
 }): Multiplayer {
@@ -290,6 +291,11 @@ export function connectMultiplayer(opts: {
           const painting = cleanPlaced(d.painting, d.painting.id);
           if (painting) opts.onGallery?.({ op: "put", painting });
         }
+      });
+
+      // New or changed posts, songs or comments (sent by the server).
+      await channel.subscribe("content", (msg) => {
+        if (msg.clientId === "server:mod") opts.onContent?.();
       });
 
       // Moderator silences. Only the server may send these (reserved sender).

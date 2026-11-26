@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAdminAuthenticated } from "@/lib/session";
 import { normalizeSongLink } from "@/lib/songSource";
+import { announceChange } from "@/lib/announce";
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) {
@@ -41,5 +42,6 @@ export async function POST(request: Request) {
     },
   });
 
+  await announceChange("songs");
   return NextResponse.json(song, { status: 201 });
 }
