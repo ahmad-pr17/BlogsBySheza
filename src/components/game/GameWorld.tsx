@@ -1727,6 +1727,40 @@ export function GameWorld({
         ctx.fillStyle = fly ? "rgba(53,55,56,0.2)" : "rgba(53,55,56,0.28)";
         ctx.fillRect(px - 5, py - 2, 10, 2);
         ctx.fillRect(px - 3, py - 3, 6, 1);
+        // Dancing makes a glowing pool of light on the floor: colours that cycle for
+        // the dance, gold for the waltz, rose for the princess dance. A normal-blend
+        // layer shows on pale floors too (a glow that only adds light vanishes on
+        // marble), and an additive layer on top makes it shine.
+        if (action === "!dance" || action === "!waltz" || action === "!princess") {
+          const hue = action === "!dance" ? (t * 120) % 360 : action === "!waltz" ? 45 : 340;
+          const r = (action === "!dance" ? 30 : 27) * (1 + Math.sin(t * 6) * 0.1);
+          ctx.save();
+          ctx.translate(px, py - 1);
+          ctx.scale(1, 0.55); // a pool on the floor, not a ball
+          const pool = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+          pool.addColorStop(0, `hsla(${hue},95%,60%,0.6)`);
+          pool.addColorStop(0.55, `hsla(${hue},95%,62%,0.3)`);
+          pool.addColorStop(1, `hsla(${hue},95%,65%,0)`);
+          ctx.fillStyle = pool;
+          ctx.fillRect(-r, -r, r * 2, r * 2);
+          ctx.globalCompositeOperation = "lighter";
+          const shine = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.7);
+          shine.addColorStop(0, `hsla(${hue},100%,70%,0.45)`);
+          shine.addColorStop(1, `hsla(${hue},100%,70%,0)`);
+          ctx.fillStyle = shine;
+          ctx.fillRect(-r, -r, r * 2, r * 2);
+          ctx.restore();
+          ctx.globalCompositeOperation = "source-over";
+          if (action === "!dance") {
+            // little lights twirling up around the dancer
+            for (let i = 0; i < 8; i++) {
+              const a2 = actAge * 3 + (i / 8) * Math.PI * 2;
+              const rise = (actAge * 0.9 + i * 0.125) % 1;
+              ctx.fillStyle = `hsla(${(hue + i * 45) % 360},100%,72%,${1 - rise})`;
+              ctx.fillRect(Math.round(px + Math.cos(a2) * 11), Math.round(py - 4 - rise * 26), 2, 2);
+            }
+          }
+        }
         if (isSuper && fly) {
           const fw = Math.sin(t * 14) > 0 ? 6 : 4;
           ctx.fillStyle = "#fff9d6";
@@ -1761,14 +1795,6 @@ export function GameWorld({
         if (gown) {
           const base = py - lift;
           const fl = Math.round(flare);
-          // a golden spotlight on the floor
-          ctx.globalCompositeOperation = "lighter";
-          const sp = ctx.createRadialGradient(px, py - 1, 0, px, py - 1, 24);
-          sp.addColorStop(0, "rgba(255,226,140,0.32)");
-          sp.addColorStop(1, "rgba(255,226,140,0)");
-          ctx.fillStyle = sp;
-          ctx.fillRect(px - 24, py - 14, 48, 26);
-          ctx.globalCompositeOperation = "source-over";
           // the arms: holding the skirt, out for the waltz, raised for the pirouettes, wide for the leaps
           const mode = phase === 2 ? "up" : phase === 3 || phase === 1 ? "out" : "skirt";
           for (const side of [-1, 1]) {
