@@ -1638,6 +1638,46 @@ export function GameWorld({
       ctx.setTransform(S, 0, 0, S, -s.camX * S, -s.camY * S);
 
       const flyLift = (fly: boolean) => (fly ? 11 + Math.sin(t * 5) * 1.5 : 0);
+      // Dancers' glows, drawn again after the night colour grade so they still shine in the dark.
+      const danceGlows: { px: number; py: number; hue: number; r: number; dance: boolean; age: number }[] = [];
+      const flushDanceGlows = () => {
+        if (!danceGlows.length) return;
+        const k = Math.min(1, dark * 1.4); // how much the dark makes the glow stand out
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (const d of danceGlows) {
+          const r = d.r * (1 + k * 0.5);
+          ctx.save();
+          ctx.translate(d.px, d.py - 1);
+          ctx.scale(1, 0.55);
+          const g1 = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+          g1.addColorStop(0, `hsla(${d.hue},100%,62%,${0.12 + k * 0.6})`);
+          g1.addColorStop(0.6, `hsla(${d.hue},100%,60%,${0.05 + k * 0.28})`);
+          g1.addColorStop(1, `hsla(${d.hue},100%,60%,0)`);
+          ctx.fillStyle = g1;
+          ctx.fillRect(-r, -r, r * 2, r * 2);
+          ctx.restore();
+          if (k > 0.05) {
+            // a soft halo around the dancer as well, so the whole figure seems lit
+            const g2 = ctx.createRadialGradient(d.px, d.py - 14, 0, d.px, d.py - 14, 24);
+            g2.addColorStop(0, `hsla(${d.hue},100%,65%,${0.28 * k})`);
+            g2.addColorStop(1, `hsla(${d.hue},100%,65%,0)`);
+            ctx.fillStyle = g2;
+            ctx.fillRect(d.px - 24, d.py - 38, 48, 48);
+          }
+          if (d.dance) {
+            // little lights twirling up around the dancer
+            for (let i = 0; i < 8; i++) {
+              const a2 = d.age * 3 + (i / 8) * Math.PI * 2;
+              const rise = (d.age * 0.9 + i * 0.125) % 1;
+              ctx.fillStyle = `hsla(${(d.hue + i * 45) % 360},100%,72%,${1 - rise})`;
+              ctx.fillRect(Math.round(d.px + Math.cos(a2) * 11), Math.round(d.py - 4 - rise * 26), 2, 2);
+            }
+          }
+        }
+        ctx.restore();
+        danceGlows.length = 0;
+      };
       const paintActor = (
         x: number,
         y: number,
@@ -1751,15 +1791,7 @@ export function GameWorld({
           ctx.fillRect(-r, -r, r * 2, r * 2);
           ctx.restore();
           ctx.globalCompositeOperation = "source-over";
-          if (action === "!dance") {
-            // little lights twirling up around the dancer
-            for (let i = 0; i < 8; i++) {
-              const a2 = actAge * 3 + (i / 8) * Math.PI * 2;
-              const rise = (actAge * 0.9 + i * 0.125) % 1;
-              ctx.fillStyle = `hsla(${(hue + i * 45) % 360},100%,72%,${1 - rise})`;
-              ctx.fillRect(Math.round(px + Math.cos(a2) * 11), Math.round(py - 4 - rise * 26), 2, 2);
-            }
-          }
+          danceGlows.push({ px, py, hue, r, dance: action === "!dance", age: actAge });
         }
         if (isSuper && fly) {
           const fw = Math.sin(t * 14) > 0 ? 6 : 4;
@@ -2049,6 +2081,7 @@ export function GameWorld({
           tv: s.tv,
         };
         drawRoomScene(ctx, art, paintedBgs.current[s.scene as RoomId] ?? roomBgs[s.scene as RoomId], s.scene, W, hs, t, actors);
+        flushDanceGlows(); // after the room's darkness, so dancers still glow
 
         // screen-space: the label of whatever you are at
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2346,6 +2379,7 @@ export function GameWorld({
 
       // emissive things go on after the grade: fairy lights and fireflies
       ctx.setTransform(S, 0, 0, S, -s.camX * S, -s.camY * S);
+      flushDanceGlows();
       // golden fairy lights along the home street: strings between the lamp
       // posts, a row along each house eave, and a warm glow round every lamp
       if (s.scene === "out" && s.camY < 200 && s.camY + vh > 80) {
