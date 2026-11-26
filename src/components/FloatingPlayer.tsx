@@ -97,6 +97,8 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
     } else {
       audio.pause();
     }
+    // everyone in the town hears the same thing
+    if (currentId) playerBus.announce(currentId, audio.paused === false);
   }
 
   function pick(id: string) {
@@ -107,7 +109,29 @@ export function FloatingPlayer({ songs }: { songs: Song[] }) {
     }
     playAfterSwitch.current = true; // picking a song plays it
     setCurrentId(id);
+    playerBus.announce(id, true);
   }
+
+  // Another player picked, played or paused a song: do the same here.
+  function applyRemote(id: string, shouldPlay: boolean) {
+    const audio = audioRef.current;
+    if (!audio || !songs.some((s) => s.id === id)) return;
+    if (id !== currentId) {
+      playAfterSwitch.current = shouldPlay;
+      setCurrentId(id);
+      return;
+    }
+    if (shouldPlay && audio.paused) audio.play().catch(() => {});
+    else if (!shouldPlay && !audio.paused) audio.pause();
+  }
+  const remoteRef = useRef(applyRemote);
+  useEffect(() => {
+    remoteRef.current = applyRemote;
+  });
+  useEffect(() => {
+    playerBus.setRemoteHandler((id, p) => remoteRef.current(id, p));
+    return () => playerBus.setRemoteHandler(null);
+  }, []);
 
   if (!current) return null;
   const hasLibrary = songs.length > 1;

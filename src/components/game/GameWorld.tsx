@@ -35,6 +35,22 @@ import { FishingGame } from "@/components/game/FishingGame";
 import { Library } from "@/components/game/Library";
 import { PianoModal } from "@/components/game/PianoModal";
 import { TvModal } from "@/components/game/TvModal";
+import { Easel } from "@/components/game/Easel";
+import { StudyDesk } from "@/components/game/StudyDesk";
+import { composeRooms } from "@/components/game/gallery";
+import { pomodoro, PHASE_LABEL } from "@/components/game/pomodoro";
+import { playerBus } from "@/lib/playerBus";
+import {
+  clampX,
+  clampY,
+  FRAME_H,
+  FRAME_W,
+  SHOWROOM_SLOTS,
+  WALL_BOTTOM,
+  type Gallery,
+  type GalleryEvent,
+  type PlacedPainting,
+} from "@/lib/galleryShared";
 import { Wardrobe } from "@/components/game/Wardrobe";
 import { DEFAULT_STYLE, drawFlowerCrown, drawHairExtras, drawOutfit, hairSheet, headAnchor, loadStyle, OUTFITS, saveStyle, type Style } from "@/components/game/style";
 import {
@@ -65,6 +81,8 @@ import {
   randomName,
   type Multiplayer,
   type PlayerInfo,
+  type WorldEvent,
+  type WorldState,
 } from "@/components/game/multiplayer";
 import {
   buildWorld,
@@ -142,10 +160,12 @@ export function GameWorld({
   initialSlug,
   initialPage,
   boards: initialBoards,
+  gallery: initialGallery,
 }: {
   stops: Stop[];
   nodes: Record<string, ReactNode>;
   boards: BoardTexts;
+  gallery: Gallery;
   initialSlug?: string;
   initialPage?: "about" | "song";
 }) {
@@ -167,6 +187,7 @@ export function GameWorld({
       bedroom: buildRoom("bedroom", homeStage),
       study: buildRoom("study", homeStage),
       ballroom: buildRoom("ballroom", homeStage),
+      gallery: buildRoom("gallery", homeStage),
     }),
     [homeStage],
   );
@@ -200,6 +221,22 @@ export function GameWorld({
   const [tvOpen, setTvOpen] = useState(false);
   const [tvChannel, setTvChannel] = useState(1);
   const [pianoOpen, setPianoOpen] = useState(false);
+  const [studyOpen, setStudyOpen] = useState(false);
+  const [easelOpen, setEaselOpen] = useState(false);
+  const [gallery, setGallery] = useState<Gallery>(initialGallery);
+  // each room's wall with its paintings on it (rooms without paintings use the plain background)
+  const paintedBgs = useRef<Partial<Record<RoomId, HTMLCanvasElement>>>({});
+  // a painting Sheza is carrying: click a wall in any room to hang it
+  const [hang, setHang] = useState<{ data: string; id: string | null } | null>(null);
+  // what everyone shares (jars, TV, jukebox, study timer), as far as we know
+  const shared = useRef<{ tv: number | null; song: { id: string; playing: boolean } | null }>({ tv: null, song: null });
+  const worldHandler = useRef<(e: WorldEvent) => void>(() => {});
+  const applyGallery = (e: GalleryEvent) =>
+    setGallery((prev) =>
+      e.op === "remove"
+        ? prev.filter((p) => p.id !== e.id)
+        : [...prev.filter((p) => p.id !== e.painting.id), e.painting],
+    );
   const [wardrobe, setWardrobe] = useState<{ tab: "dress" | "hair"; tint: number } | null>(null);
   const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
   const [playersOpen, setPlayersOpen] = useState(false);
@@ -287,6 +324,7 @@ export function GameWorld({
     choice: DEFAULT_CHOICE as Choice,
     ownerChoice: OWNER_CHOICE as Choice,
     chosenName: "",
+    hang: null as null | { data: string; id: string | null }, // the painting being hung
   });
 
   const showToast = useCallback((msg: string) => {
@@ -384,6 +422,14 @@ export function GameWorld({
         setMpOn(true);
       },
       onEvent: (kind) => sound.play(kind === "chat" ? "chat" : "pop"),
+      onWorld: (e) => worldHandler.current(e),
+      onGallery: (e) => applyGallery(e),
+      getWorld: (): WorldState => {
+        const now = performance.now();
+        const jars: Record<string, number> = {};
+        for (const [id, until] of Object.entries(g.current.jars)) if (until > now) jars[id] = Math.round(until - now);
+        return { jars, tv: shared.current.tv, song: shared.current.song, pomo: pomodoro.wire() };
+      },
       onBoard: (id, board) => {
         const clean = cleanBoard(board);
         if (isBoardId(id) && clean) setBoards((prev) => ({ ...prev, [id]: clean }));
@@ -398,7 +444,15 @@ export function GameWorld({
       },
     });
     mpRef.current = mp;
+    // share the jukebox and the study timer with everyone
+    playerBus.setLocalListener((id, playing) => {
+      shared.current.song = { id, playing };
+      mp.world({ k: "song", id, playing });
+    });
+    pomodoro.setBroadcast((w) => mp.world({ k: "pomo", w }));
     return () => {
+      playerBus.setLocalListener(null);
+      pomodoro.setBroadcast(null);
       mp.close();
       mpRef.current = null;
       setMpOn(false);
@@ -543,7 +597,9 @@ export function GameWorld({
   };
   const changeChannel = (n: number) => {
     g.current.tv = n;
+    shared.current.tv = n;
     setTvChannel(n);
+    mpRef.current?.world({ k: "tv", n });
   };
   const closeRecipes = () => {
     g.current.open = false;
@@ -700,6 +756,182 @@ export function GameWorld({
   }, []);
   const playSound = useCallback((name: string) => sound.play(name as SoundName), []);
 
+  // Let the fireflies out of a jar. Whoever opens it, it opens for everyone:
+  // the jar is empty for a while on every screen.
+  const spillJar = useCallback(
+    (what: string, remote: boolean) => {
+      const s = g.current;
+      const it = world.interacts.find((i) => i.act === what);
+      if (!it) return;
+      const now = performance.now();
+      if ((s.jars[what] ?? 0) > now) {
+        if (!remote) showToast("The jar is empty. The fireflies will come back soon.");
+        return;
+      }
+      s.jars[what] = now + 100000;
+      const born = now / 1000;
+      const n = 11 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 8 + Math.random() * 20;
+        s.swarm.push({
+          x: it.signX + Math.cos(a) * 2,
+          y: it.signY - 2 + Math.sin(a) * 2,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp - 12,
+          p: Math.random() * Math.PI * 2,
+          born,
+          life: 22 + Math.random() * 12,
+        });
+      }
+      if (s.swarm.length > 130) s.swarm.splice(0, s.swarm.length - 130);
+      if (remote) {
+        if (s.scene === "out") showToast("✨ Someone let the fireflies out of a jar!");
+      } else {
+        sound.play("chime");
+        showToast("✨ A cloud of fireflies floats out!");
+        mpRef.current?.world({ k: "jar", id: what });
+      }
+    },
+    [world, showToast],
+  );
+
+  // Changes other players make to the shared things.
+  useEffect(() => {
+    worldHandler.current = (e: WorldEvent) => {
+      const s = g.current;
+      const applyTv = (n: number) => {
+        s.tv = n;
+        shared.current.tv = n;
+        setTvChannel(n);
+      };
+      const applySong = (id: string, playing: boolean) => {
+        shared.current.song = { id, playing };
+        playerBus.applyRemote(id, playing);
+      };
+      if (e.k === "jar") spillJar(e.id, true);
+      else if (e.k === "tv") applyTv(e.n);
+      else if (e.k === "song") applySong(e.id, e.playing);
+      else if (e.k === "pomo") pomodoro.apply(e.w);
+      else {
+        // what a newcomer is told: jars that are still empty, TV, music, timer
+        const now = performance.now();
+        for (const [id, ms] of Object.entries(e.s.jars)) s.jars[id] = now + ms;
+        if (e.s.tv) applyTv(e.s.tv);
+        if (e.s.song) applySong(e.s.song.id, e.s.song.playing);
+        if (e.s.pomo) pomodoro.apply(e.s.pomo);
+      }
+    };
+  }, [spillJar]);
+
+  // The study timer: tick it, and say when a session ends (for everyone).
+  useEffect(() => {
+    pomodoro.onFinish((from, to) => {
+      sound.play("chime");
+      showToast(
+        from === "focus"
+          ? `🍅 Focus session done! Time for a ${PHASE_LABEL[to].toLowerCase()}.`
+          : "☕ Break over. Ready for the next focus session?",
+      );
+    });
+    const id = setInterval(() => pomodoro.tick(), 500);
+    return () => {
+      clearInterval(id);
+      pomodoro.onFinish(null);
+      sound.lofiStop();
+    };
+  }, [showToast]);
+
+  // Paintings on the palace walls: framed onto each room's background.
+  useEffect(() => {
+    if (!assets) return;
+    let alive = true;
+    composeRooms(assets.roomBgs, gallery).then((out) => {
+      if (alive) paintedBgs.current = out;
+    });
+    return () => {
+      alive = false;
+    };
+  }, [assets, gallery]);
+
+  // ---- hanging paintings (Sheza and the superadmin) ----
+  const putPainting = useCallback(
+    async (p: { id: string | null; room: RoomId; x: number; y: number; data: string }): Promise<string | null> => {
+      try {
+        const res = await fetch("/api/gallery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "put", painting: { ...p, id: p.id ?? undefined } }),
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok) return res.status === 401 ? "Please log in again to hang paintings." : (body?.error ?? "Could not hang it.");
+        applyGallery({ op: "put", painting: body.painting });
+        return null;
+      } catch {
+        return "Could not reach the server.";
+      }
+    },
+    [],
+  );
+
+  const startHanging = useCallback(
+    (data: string, id: string | null) => {
+      closePopup(() => setEaselOpen(false));
+      g.current.hang = { data, id };
+      setHang({ data, id });
+      showToast("🖼 Click a wall to hang it. You can walk to any room first.");
+    },
+    [closePopup, showToast],
+  );
+  const cancelHanging = useCallback(() => {
+    g.current.hang = null;
+    setHang(null);
+  }, []);
+
+  // The showroom puts it in the next free spot on its walls.
+  const hangInShowroom = useCallback(
+    async (data: string, id: string | null): Promise<string | null> => {
+      const mine = gallery.find((p) => p.id === id);
+      const used = gallery.filter((p) => p.room === "gallery" && p.id !== id);
+      const free = mine?.room === "gallery"
+        ? { x: mine.x, y: mine.y }
+        : SHOWROOM_SLOTS.find((sl) => !used.some((p) => Math.abs(p.x - sl.x) < FRAME_W && Math.abs(p.y - sl.y) < FRAME_H));
+      if (!free) return "The showroom is full. Take a painting down first.";
+      const err = await putPainting({ id, room: "gallery", x: free.x, y: free.y, data });
+      if (!err) {
+        cancelHanging();
+        showToast("🏛 Hung in the showroom!");
+      }
+      return err;
+    },
+    [gallery, putPainting, cancelHanging, showToast],
+  );
+
+  const takeDown = useCallback(async (id: string): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove", id }),
+      });
+      if (!res.ok) return res.status === 401 ? "Please log in again." : "Could not take it down.";
+      applyGallery({ op: "remove", id });
+      return null;
+    } catch {
+      return "Could not reach the server.";
+    }
+  }, []);
+
+  // Esc drops the painting you are carrying.
+  useEffect(() => {
+    if (!hang) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancelHanging();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hang, cancelHanging]);
+
   const handleAct = useCallback(
     (what: string) => {
       const s = g.current;
@@ -715,32 +947,7 @@ export function GameWorld({
         return;
       }
       if (what.startsWith("jar:")) {
-        const it = world.interacts.find((i) => i.act === what);
-        if (!it) return;
-        const now = performance.now();
-        if ((s.jars[what] ?? 0) > now) {
-          showToast("The jar is empty. The fireflies will come back soon.");
-          return;
-        }
-        s.jars[what] = now + 100000;
-        const born = now / 1000;
-        const n = 11 + Math.floor(Math.random() * 5);
-        for (let i = 0; i < n; i++) {
-          const a = Math.random() * Math.PI * 2;
-          const sp = 8 + Math.random() * 20;
-          s.swarm.push({
-            x: it.signX + Math.cos(a) * 2,
-            y: it.signY - 2 + Math.sin(a) * 2,
-            vx: Math.cos(a) * sp,
-            vy: Math.sin(a) * sp - 12,
-            p: Math.random() * Math.PI * 2,
-            born,
-            life: 22 + Math.random() * 12,
-          });
-        }
-        if (s.swarm.length > 130) s.swarm.splice(0, s.swarm.length - 130);
-        sound.play("chime");
-        showToast("✨ A cloud of fireflies floats out!");
+        spillJar(what, false);
         return;
       }
       if (what.startsWith("board:")) {
@@ -793,6 +1000,13 @@ export function GameWorld({
         case "piano":
           openPopup(() => setPianoOpen(true));
           break;
+        case "study":
+          openPopup(() => setStudyOpen(true));
+          break;
+        case "easel":
+          if (s.owner || s.admin) openPopup(() => setEaselOpen(true));
+          else showToast("🎨 Sheza's easel. Her paintings hang on the study walls.");
+          break;
         case "wardrobe":
         case "mirror":
           if (!s.owner) {
@@ -843,7 +1057,7 @@ export function GameWorld({
           break;
       }
     },
-    [fadeTo, switchScene, showToast, openPopup, world],
+    [fadeTo, switchScene, showToast, openPopup, spillJar],
   );
 
   const activate = useCallback(
@@ -936,7 +1150,7 @@ export function GameWorld({
             art,
             ground: buildGround(world, art),
             roomBgs: Object.fromEntries(
-              (["home", "kitchen", "living", "bedroom", "study", "ballroom"] as RoomId[]).map((id) => [id, buildRoomBg(id, art)]),
+              (["home", "kitchen", "living", "bedroom", "study", "ballroom", "gallery"] as RoomId[]).map((id) => [id, buildRoomBg(id, art)]),
             ) as Record<RoomId, HTMLCanvasElement>,
           });
       })
@@ -1772,7 +1986,7 @@ export function GameWorld({
           y: s.y,
           tv: s.tv,
         };
-        drawRoomScene(ctx, art, roomBgs[s.scene], s.scene, W, hs, t, actors);
+        drawRoomScene(ctx, art, paintedBgs.current[s.scene as RoomId] ?? roomBgs[s.scene as RoomId], s.scene, W, hs, t, actors);
 
         // screen-space: the label of whatever you are at
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2284,6 +2498,18 @@ export function GameWorld({
         return;
       }
     }
+    if (s.hang && s.scene !== "out" && wy < WALL_BOTTOM) {
+      const room = s.scene as RoomId;
+      const { data, id } = s.hang;
+      void putPainting({ id, room, x: clampX(wx - FRAME_W / 2), y: clampY(wy - FRAME_H / 2), data }).then((err) => {
+        if (err) showToast(err);
+        else {
+          cancelHanging();
+          showToast("🖼 Hung! Everyone can see it.");
+        }
+      });
+      return;
+    }
     if (s.fly || !tileBlocked(cw, wx, wy)) {
       s.target = { x: wx, y: wy, arrive: null };
       s.route = s.fly ? [] : (planRoute(cw, s.x, s.y, wx, wy) ?? []);
@@ -2520,6 +2746,32 @@ export function GameWorld({
         />
       )}
       {pianoOpen && <PianoModal onClose={() => closePopup(() => setPianoOpen(false))} />}
+      {studyOpen && <StudyDesk onClose={() => closePopup(() => setStudyOpen(false))} onSound={playSound} />}
+      {easelOpen && (
+        <Easel
+          gallery={gallery}
+          onHang={startHanging}
+          onShowroom={hangInShowroom}
+          onRemove={takeDown}
+          onClose={() => closePopup(() => setEaselOpen(false))}
+          onSound={playSound}
+        />
+      )}
+      {hang && (
+        <div className="g-hangbar" role="status">
+          <p>
+            🖼 {scene === "out"
+              ? "Go inside the palace, then click a wall to hang your painting."
+              : "Click a wall to hang your painting here, or walk to another room first."}
+          </p>
+          <button type="button" className="g-gate-btn" onClick={() => void hangInShowroom(hang.data, hang.id).then((e) => e && showToast(e))}>
+            🏛 Showroom instead
+          </button>
+          <button type="button" className="g-gate-btn" onClick={cancelHanging}>
+            Cancel
+          </button>
+        </div>
+      )}
       {editBoard && (
         <BoardEditor
           id={editBoard}

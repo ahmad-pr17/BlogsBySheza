@@ -28,6 +28,7 @@ export const ROOM_NAMES: Record<RoomId, string> = {
   bedroom: "Bedroom",
   study: "Study",
   ballroom: "Ballroom",
+  gallery: "Gallery",
 };
 
 // Where the exit door at the bottom of each room leads.
@@ -38,6 +39,7 @@ export const EXIT_TO: Record<RoomId, Scene> = {
   bedroom: "home",
   study: "bedroom",
   ballroom: "home",
+  gallery: "home",
 };
 
 // Where you appear when you walk from one scene into a room.
@@ -47,6 +49,7 @@ export function arrival(to: RoomId, from: Scene): { x: number; y: number; dir: n
     if (from === "living") return { x: 262, y: 98, dir: 4 };
     if (from === "bedroom") return { x: 160, y: 142, dir: 4 };
     if (from === "ballroom") return { x: 292, y: 152, dir: 6 };
+    if (from === "gallery") return { x: 28, y: 152, dir: 2 };
   }
   if (to === "bedroom" && from === "study") return { x: 276, y: 100, dir: 4 };
   return { x: 160, y: 198, dir: 0 };
@@ -83,6 +86,7 @@ const CLOCK: Record<RoomId, [number, number]> = {
   bedroom: [194, 12],
   study: [115, 12],
   ballroom: [74, 14],
+  gallery: [0, 0], // (no clock: the walls are for paintings)
 };
 
 const WINDOWS: Record<RoomId, [number, number, number, number][]> = {
@@ -92,6 +96,7 @@ const WINDOWS: Record<RoomId, [number, number, number, number][]> = {
   bedroom: [[124, 12, 32, 32]],
   study: [[132, 10, 40, 34]],
   ballroom: [[44, 10, 28, 34], [146, 10, 28, 34], [248, 10, 28, 34]],
+  gallery: [],
 };
 
 // the pot on the stove, for steam
@@ -194,6 +199,7 @@ export function buildRoom(id: RoomId, stage = 0): World {
     });
     put("armorStand", 32, 112, { cols: [1, 1], rows: [6, 6] });
     spot("ballroom", "go:ballroom", "Ballroom", "Go to the ballroom", 306, 140, 294, 150, 22, 24);
+    spot("gallery", "go:gallery", "Gallery", "Visit the painting gallery", 14, 140, 28, 150, 22, 24);
     put("armorStand", 32, 200, { cols: [1, 1], rows: [12, 12] });
     put("bigPlant", 288, 214, { cols: [18, 18], rows: [13, 13] });
   }
@@ -289,6 +295,11 @@ export function buildRoom(id: RoomId, stage = 0): World {
     put("ladder", 206, 90);
     put("f_rugStudy", 160, 180, { flat: true });
     put("readingDesk", 160, 142, { cols: [8, 11], rows: [7, 8] });
+    // sit at the desk: the study timer, sticky notes and lo-fi music
+    spot("desk", "study", "Study desk", "Sit at the desk", 160, 142, 160, 184, 8, 30);
+    // Sheza's painting easel (her pictures hang on the walls)
+    put("easel", 292, 132, { cols: [18, 18], rows: [7, 7] });
+    spot("easel", "easel", "Easel", "Paint at the easel", 292, 132, 276, 140, 16, 22);
     put("f_chairF", 160, 168, { cols: [9, 9], rows: [10, 10] });
     put("globe", 100, 140, { interact: "globe", cols: [6, 6], rows: [8, 8] });
     spot("globe", "globe", "Globe", "Spin the globe", 100, 140, 100, 156, 14, 16);
@@ -302,6 +313,18 @@ export function buildRoom(id: RoomId, stage = 0): World {
     put("bigPlant", 292, 214, { cols: [18, 18], rows: [13, 13] });
     put("bigPlant", 30, 214, { cols: [1, 1], rows: [13, 13] });
     if (stage >= 2) put("bookStack", 200, 200);
+  }
+
+  if (id === "gallery") {
+    // the painting showroom: a long bright hall; the walls are left bare for pictures
+    put("f_runnerShort", 160, 226, { flat: true });
+    put("f_rugRoyal", 160, 150, { flat: true });
+    put("pillar", 34, 214, { cols: [2, 2], rows: [12, 12] });
+    put("pillar", 286, 214, { cols: [17, 17], rows: [12, 12] });
+    put("topiary", 44, 104, { cols: [2, 2], rows: [5, 5] });
+    put("topiary", 276, 104, { cols: [17, 17], rows: [5, 5] });
+    put("bigPlant", 30, 160, { cols: [1, 1], rows: [9, 9] });
+    put("bigPlant", 292, 170, { cols: [18, 18], rows: [10, 10] });
   }
 
   if (id === "ballroom") {
@@ -551,6 +574,15 @@ export function buildRoomBg(id: RoomId, art: Art): HTMLCanvasElement {
     R(c, P.goldL, 307, 142, 2, 3);
     R(c, P.goldL, 314, 142, 2, 3);
     R(c, P.goldL, 307, 110, 10, 2);
+    // a matching tall door in the left-hand wall: the painting gallery
+    R(c, "#3a2a22", 0, 112, 17, 62);
+    R(c, P.gold, 2, 114, 13, 58);
+    R(c, "#4a6a9a", 3, 116, 11, 54);
+    R(c, "#6a8aba", 9, 116, 5, 54);
+    R(c, P.goldD, 8, 116, 1, 54);
+    R(c, P.goldL, 4, 142, 2, 3);
+    R(c, P.goldL, 11, 142, 2, 3);
+    R(c, P.goldL, 3, 110, 10, 2);
     // rose window above the stairs
     R(c, "#2a1f1c", 144, 6, 32, 32);
     for (let yy = 0; yy < 28; yy++)
@@ -768,6 +800,19 @@ export function buildRoomBg(id: RoomId, art: Art): HTMLCanvasElement {
       R(c, P.goldL, px + 1, 8, 1, 56);
     }
     clock(c, art, id);
+  } else if (id === "gallery") {
+    // pale marble floor, plain warm walls (two rows of frames fit on them)
+    checker(c, 16, 64, 288, 160, "#efe8dc", "#ddd3c1");
+    floorShade(c);
+    R(c, "#f1e8d4", 0, 0, W, 64);
+    for (let x = 4; x < W; x += 24) R(c, "#e8dfc6", x, 8, 1, 52);
+    R(c, "#cfc2a2", 0, 61, W, 3);
+    R(c, "#f7f0de", 0, 61, W, 1);
+    R(c, P.goldD, 0, 63, W, 1);
+    R(c, "#3a2a22", 0, 0, W, 6);
+    R(c, P.gold, 0, 6, W, 1);
+    sideWalls(c, "#e0d6bd", "#b8ab88");
+    doorway(c, P.goldD, "#f1e3b4");
   } else {
     // study: dark wood floor and panelled walls
     planks(c, rand, ["#8a5f45", "#82583f", "#7a5139", "#8f6448"]);
@@ -971,6 +1016,7 @@ const LIGHT_SRC: Record<RoomId, [number, number, number, number][]> = {
   bedroom: [[26, 76, 36, 1], [98, 76, 36, 1], [262, 184, 38, 0.8], [130, 40, 44, 0.6], [60, 110, 56, 0.5]],
   study: [[86, 150, 46, 1], [214, 112, 40, 0.8], [160, 142, 78, 0.8], [220, 22, 44, 0.4]],
   ballroom: [[80, 28, 72, 1], [160, 28, 84, 1], [240, 28, 72, 1], [160, 150, 96, 0.55]],
+  gallery: [[80, 34, 90, 0.9], [240, 34, 90, 0.9], [160, 150, 90, 0.5]],
 };
 
 let maskCv: HTMLCanvasElement | null = null;

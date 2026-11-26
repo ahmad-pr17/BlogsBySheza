@@ -839,6 +839,34 @@ function globe(): Cv {
   });
 }
 
+// A wooden easel holding a little painting of hills and a sun.
+function easel(): Cv {
+  return mk(26, 38, (c) => {
+    ell(c, P.shadow, 13, 36, 11, 1);
+    // legs
+    R(c, P.out, 3, 26, 3, 11);
+    R(c, P.woodD, 4, 26, 1, 10);
+    R(c, P.out, 20, 26, 3, 11);
+    R(c, P.woodD, 21, 26, 1, 10);
+    R(c, P.out, 12, 28, 3, 8);
+    R(c, P.woodD, 13, 28, 1, 7);
+    // the canvas on its ledge
+    R(c, P.out, 2, 2, 22, 24);
+    R(c, P.wood, 3, 3, 20, 22);
+    R(c, P.paper, 4, 4, 18, 17);
+    R(c, P.skyBlue, 4, 4, 18, 10);
+    R(c, P.yellow, 14, 6, 4, 4);
+    R(c, P.leaf, 4, 14, 18, 7);
+    R(c, P.leafD, 4, 17, 8, 4);
+    R(c, P.out, 1, 24, 24, 3);
+    R(c, P.woodL, 2, 24, 22, 1);
+    // a paint palette on the ledge
+    R(c, P.out, 17, 21, 7, 4);
+    R(c, P.red, 18, 22, 2, 2);
+    R(c, P.blue, 21, 22, 2, 2);
+  });
+}
+
 function bookStack(): Cv {
   return mk(18, 14, (c) => {
     ell(c, P.shadow, 9, 13, 8, 1);
@@ -1176,6 +1204,7 @@ export function palaceProps(): Record<string, Cv | Cv[]> {
     ladder: ladder(),
     readingDesk: readingDesk(),
     globe: globe(),
+    easel: easel(),
     diningTable: diningTable(),
     planter: planter(),
     harp: harp(),

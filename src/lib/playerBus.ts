@@ -6,6 +6,8 @@ export type PlayerState = { currentId: string | undefined; playing: boolean };
 let state: PlayerState = { currentId: undefined, playing: false };
 let pickHandler: ((id: string) => void) | null = null;
 const listeners = new Set<() => void>();
+let remoteHandler: ((id: string, playing: boolean) => void) | null = null;
+let localListener: ((id: string, playing: boolean) => void) | null = null;
 
 export const playerBus = {
   getState: () => state,
@@ -26,5 +28,20 @@ export const playerBus = {
   },
   pick(id: string) {
     pickHandler?.(id);
+  },
+  // Shared music: the game tells everyone when you pick / play / pause a song
+  // (the player calls announce), and plays along when someone else does
+  // (the player registers how, and the game calls applyRemote).
+  announce(id: string, playing: boolean) {
+    localListener?.(id, playing);
+  },
+  setLocalListener(fn: ((id: string, playing: boolean) => void) | null) {
+    localListener = fn;
+  },
+  setRemoteHandler(fn: ((id: string, playing: boolean) => void) | null) {
+    remoteHandler = fn;
+  },
+  applyRemote(id: string, playing: boolean) {
+    remoteHandler?.(id, playing);
   },
 };

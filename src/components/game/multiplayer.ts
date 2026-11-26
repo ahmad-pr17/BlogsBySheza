@@ -6,7 +6,9 @@ import { cleanRemoteMessage, cleanRemoteName } from "@/components/game/names";
 //
 // Nothing is stored: positions are broadcast only while a visitor is online.
 
+import { cleanPomoWire, type PomoWire } from "@/components/game/pomodoro";
 import { type Scene, sceneCode, sceneFromCode } from "@/components/game/scenes";
+import { cleanPlaced, isPaintId, type GalleryEvent } from "@/lib/galleryShared";
 import { HAIR_COLORS, HAIR_STYLES, OUTFITS } from "@/components/game/style";
 
 export type { Scene };
@@ -61,6 +63,48 @@ export type PlayerInfo = {
   silenced: boolean; // a moderator silenced them
 };
 
+// Things everyone in the town shares: when someone opens a firefly jar, changes
+// the TV or the jukebox, or uses the study timer, everyone else sees it too.
+export type WorldState = {
+  jars: Record<string, number>; // jar id -> ms until it is full again
+  tv: number | null;
+  song: { id: string; playing: boolean } | null;
+  pomo: PomoWire | null;
+};
+export type WorldEvent =
+  | { k: "jar"; id: string }
+  | { k: "tv"; n: number }
+  | { k: "song"; id: string; playing: boolean }
+  | { k: "pomo"; w: PomoWire }
+  | { k: "snap"; s: WorldState };
+
+const JAR_ID = /^jar:\d{1,3}$/;
+
+function cleanWorld(d: unknown): WorldEvent | null {
+  const e = d as { k?: string; id?: unknown; n?: unknown; playing?: unknown; w?: unknown; s?: Record<string, unknown> } | null;
+  if (!e || typeof e.k !== "string") return null;
+  if (e.k === "jar") return typeof e.id === "string" && JAR_ID.test(e.id) ? { k: "jar", id: e.id } : null;
+  if (e.k === "tv") return typeof e.n === "number" && e.n >= 1 && e.n <= 9 ? { k: "tv", n: Math.floor(e.n) } : null;
+  if (e.k === "song")
+    return typeof e.id === "string" && e.id.length <= 80 ? { k: "song", id: e.id, playing: e.playing === true } : null;
+  if (e.k === "pomo") {
+    const w = cleanPomoWire(e.w);
+    return w ? { k: "pomo", w } : null;
+  }
+  if (e.k === "snap" && e.s) {
+    const jars: Record<string, number> = {};
+    const rawJars = (e.s.jars ?? {}) as Record<string, unknown>;
+    for (const [id, ms] of Object.entries(rawJars)) {
+      if (JAR_ID.test(id) && typeof ms === "number" && ms > 0 && ms <= 200000) jars[id] = ms;
+    }
+    const tv = typeof e.s.tv === "number" && e.s.tv >= 1 && e.s.tv <= 9 ? Math.floor(e.s.tv) : null;
+    const so = e.s.song as { id?: unknown; playing?: unknown } | null;
+    const song = so && typeof so.id === "string" && so.id.length <= 80 ? { id: so.id, playing: so.playing === true } : null;
+    return { k: "snap", s: { jars, tv, song, pomo: cleanPomoWire(e.s.pomo) } };
+  }
+  return null;
+}
+
 export type Multiplayer = {
   players: () => PlayerInfo[]; // everyone else who is online
   mute: (id: string, on: boolean) => void; // hide one player's chat and emotes (just for you)
@@ -69,6 +113,7 @@ export type Multiplayer = {
   send: (s: MpState) => void; // call every frame; throttled inside
   emote: (kind: string) => void;
   say: (text: string) => void;
+  world: (e: WorldEvent) => void; // tell everyone about a shared change
   close: () => void;
 };
 
@@ -101,6 +146,9 @@ export function connectMultiplayer(opts: {
   onEvent?: (kind: "chat" | "emote") => void; // someone else spoke or emoted
   onSilenced?: (ms: number) => void; // a moderator silenced you
   onBoard?: (id: string, board: unknown) => void; // a notice board was edited
+  onGallery?: (e: GalleryEvent) => void; // a painting was hung, moved or taken down
+  onWorld?: (e: WorldEvent) => void; // someone changed something shared (jar, TV, music, timer)
+  getWorld?: () => WorldState; // our view of the shared things, for newcomers
 }): Multiplayer {
   const remotes = new Map<string, Remote>();
   const meta = new Map<string, { name: string; kind: string; tint: number }>();
@@ -206,18 +254,42 @@ export function connectMultiplayer(opts: {
         }
       });
 
-      // someone just arrived: broadcast our position straight away
+      // someone just arrived: broadcast our position straight away, and tell
+      // them what the shared things look like (the first answer is the one used)
       await channel.subscribe("hi", (msg) => {
         if (msg.clientId === me()) return;
         lastSent = 0;
         lastKey = "";
+        const getWorld = opts.getWorld;
+        if (!getWorld) return;
+        setTimeout(() => {
+          if (!closed && connected()) channel?.publish("w", { k: "snap", s: getWorld() }).catch(() => {});
+        }, 150 + Math.random() * 700);
       });
 
-      // A notice board was edited (sent by the server, after checking the login).
-      await channel.subscribe("board", (msg) => {
+      // Shared things changed by another player.
+      let gotSnap = false;
+      await channel.subscribe("w", (msg) => {
+        const cid = msg.clientId;
+        if (!cid || cid === me()) return;
+        const ev = cleanWorld(msg.data);
+        if (!ev) return;
+        if (ev.k === "snap") {
+          if (gotSnap) return;
+          gotSnap = true;
+        }
+        opts.onWorld?.(ev);
+      });
+
+      // A painting was hung, moved or taken down (sent by the server, after checking the login).
+      await channel.subscribe("gallery", (msg) => {
         if (msg.clientId !== "server:mod") return;
-        const d = msg.data as { id?: string; board?: unknown };
-        if (typeof d?.id === "string") opts.onBoard?.(d.id, d.board);
+        const d = msg.data as { op?: string; id?: unknown; painting?: { id?: unknown } };
+        if (d?.op === "remove" && isPaintId(d.id)) opts.onGallery?.({ op: "remove", id: d.id });
+        else if (d?.op === "put" && isPaintId(d.painting?.id)) {
+          const painting = cleanPlaced(d.painting, d.painting.id);
+          if (painting) opts.onGallery?.({ op: "put", painting });
+        }
       });
 
       // Moderator silences. Only the server may send these (reserved sender).
@@ -365,6 +437,10 @@ export function connectMultiplayer(opts: {
     say(text) {
       if (!connected()) return;
       channel!.publish("m", { t: text }).catch(() => {});
+    },
+    world(e) {
+      if (!connected()) return;
+      channel!.publish("w", e).catch(() => {});
     },
     close() {
       closed = true;

@@ -309,3 +309,235 @@ button.g-action.g-action-owner {
   background: #ffd9ea;
   border-color: #c96a90;
 }
+
+/* Study desk (pomodoro + sticky notes) and the painting easel */
+.g-desk-card,
+.g-easel-card {
+  display: grid;
+  gap: 10px;
+  width: min(480px, 100%);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+.g-pomo {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 8px;
+}
+.g-pomo[data-phase="short"],
+.g-pomo[data-phase="long"] {
+  background: #d9f0d2;
+}
+.g-pomo-phase {
+  margin: 0;
+  font-size: 16px;
+}
+.g-pomo-phase small {
+  opacity: 0.7;
+}
+.g-pomo-time {
+  margin: 0;
+  font-size: 52px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+.g-pomo-bar {
+  height: 10px;
+  overflow: hidden;
+  background: rgba(58, 42, 34, 0.18);
+  border-radius: 5px;
+}
+.g-pomo-bar span {
+  display: block;
+  height: 100%;
+  background: #a1352a;
+  transition: width 0.3s linear;
+}
+.g-pomo[data-phase="short"] .g-pomo-bar span,
+.g-pomo[data-phase="long"] .g-pomo-bar span {
+  background: #3a6b3a;
+}
+.g-desk-card .g-board-row .g-gate-btn[aria-pressed="true"],
+.g-easel-card .g-board-row .g-gate-btn[aria-pressed="true"] {
+  background: #f6c453;
+}
+.g-notes {
+  display: grid;
+  gap: 8px;
+}
+.g-notes-title {
+  margin: 0;
+  font-size: 15px;
+}
+.g-notes-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.g-note {
+  position: relative;
+  padding: 8px 22px 8px 8px;
+  font-size: 14px;
+  line-height: 1.25;
+  color: #3a2a18;
+  border-radius: 2px;
+  box-shadow: 2px 3px 0 rgba(58, 42, 34, 0.3);
+}
+.g-note:nth-child(odd) {
+  transform: rotate(-1.2deg);
+}
+.g-note:nth-child(even) {
+  transform: rotate(1deg);
+}
+.g-note {
+  min-width: 0;
+  overflow: hidden;
+}
+.g-note label {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.g-note label span {
+  min-width: 0;
+  overflow-wrap: anywhere; /* long words wrap instead of running under the × */
+}
+.g-note input[type="checkbox"] {
+  flex: none;
+  margin-top: 2px;
+}
+.g-note.done span {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+/* The × button: more specific than ".g-recipes-card li button", which would
+   otherwise stretch it over the whole note and hide the text. */
+.g-recipes-card .g-note .g-note-x {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  display: block;
+  width: auto;
+  min-height: 0;
+  padding: 0 5px;
+  font-size: 18px;
+  line-height: 1.2;
+  color: #5c3416;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.g-recipes-card .g-note .g-note-x:hover,
+.g-recipes-card .g-note .g-note-x:focus-visible {
+  background: rgba(58, 42, 34, 0.15);
+}
+.g-notes-add {
+  display: flex;
+  gap: 8px;
+}
+.g-notes-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 16px;
+  color: #3a2a18;
+  background: var(--parchment-hi);
+  border: 3px solid var(--wood-dark);
+  border-radius: 6px;
+}
+.g-easel-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 56 / 44;
+  image-rendering: pixelated;
+  touch-action: none;
+  cursor: crosshair;
+  border: 6px solid #8a5f45;
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px #3a2a22;
+}
+.g-easel-palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+}
+.g-swatch {
+  aspect-ratio: 1;
+  border: 3px solid var(--wood-dark);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.g-swatch[aria-pressed="true"] {
+  outline: 3px solid #f6c453;
+  outline-offset: 1px;
+}
+
+/* paintings already hanging, listed in the easel */
+.g-hung {
+  display: grid;
+  gap: 6px;
+}
+.g-hung-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.g-recipes-card .g-hung-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.g-hung-list img {
+  image-rendering: pixelated;
+  border: 3px solid #8a5f45;
+  border-radius: 3px;
+}
+.g-hung-list span {
+  flex: 1 1 70px;
+}
+.g-hung-list .g-gate-btn {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+/* the "choose a wall" bar */
+.g-hangbar {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  width: min(560px, calc(100vw - 24px));
+  padding: 10px 12px;
+  transform: translateX(-50%);
+  font-family: var(--font-pixelify), monospace;
+  font-size: 15px;
+  color: #3a2a18;
+  background: var(--menu-bar);
+  border: 4px solid var(--wood-dark);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 3px #f0c48c, 0 6px 0 rgba(0, 0, 0, 0.4);
+}
+.g-hangbar p {
+  flex: 1 1 100%;
+  margin: 0;
+  text-align: center;
+}
